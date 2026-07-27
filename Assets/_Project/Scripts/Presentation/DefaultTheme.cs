@@ -42,5 +42,10 @@ namespace Game.Presentation
         public Color DefeatColor => new Color32(214, 69, 69, 255);      // #D64545
         public string VictoryMessage => "VICTORY";
         public string DefeatMessage => "ELIMINATED";
+
+        // Run flow
+        public string RoomClearedMessage => "ROOM CLEARED";
+        public string RunVictoryMessage => "YOU SURVIVED";
+        public string RunDefeatMessage => "ELIMINATED";
     }
 }

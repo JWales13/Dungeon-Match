@@ -21,6 +21,8 @@ namespace Game.Gameplay
 
         public void Initialize(MonsterCombatObjective objective)
         {
+            Unsubscribe();
+
             _objective = objective;
             ApplyTheme();
 
@@ -34,6 +36,15 @@ namespace Game.Gameplay
         }
 
         private void OnDestroy()
+        {
+            Unsubscribe();
+        }
+
+        /// <summary>
+        /// Detaches from the current objective so this HUD can be re-pointed at
+        /// the next room's objective without stacking duplicate handlers.
+        /// </summary>
+        private void Unsubscribe()
         {
             if (_objective == null)
             {

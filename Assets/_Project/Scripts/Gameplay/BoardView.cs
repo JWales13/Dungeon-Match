@@ -21,6 +21,8 @@ namespace Game.Gameplay
 
         public void Initialize(Board board)
         {
+            Teardown();
+
             _board = board;
             _cellSize = Theme.Current.CellSize;
             ApplyCameraBackground();
@@ -28,6 +30,35 @@ namespace Game.Gameplay
 
             _board.TilesMatched += HandleTilesMatched;
             _board.BoardSettled += HandleBoardSettled;
+        }
+
+        /// <summary>
+        /// Detaches from the previous board and destroys its tile objects so a
+        /// new room can be rendered on the same BoardView. Safe to call when
+        /// nothing has been initialized yet.
+        /// </summary>
+        private void Teardown()
+        {
+            if (_board != null)
+            {
+                _board.TilesMatched -= HandleTilesMatched;
+                _board.BoardSettled -= HandleBoardSettled;
+            }
+
+            if (_tileViews == null)
+            {
+                return;
+            }
+
+            foreach (TileView view in _tileViews)
+            {
+                if (view != null)
+                {
+                    Destroy(view.gameObject);
+                }
+            }
+
+            _tileViews = null;
         }
 
         public bool TryGetCellAtScreenPosition(Vector2 screenPosition, out Vector2Int cell)

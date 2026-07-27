@@ -25,11 +25,16 @@ namespace Game.Presentation
         Color HudTextColor { get; }
         float HudLabelFontSize { get; }
 
-        // --- Result banner ---
+        // --- Result banner (single board) ---
         float ResultFontSize { get; }
         Color VictoryColor { get; }
         Color DefeatColor { get; }
         string VictoryMessage { get; }
         string DefeatMessage { get; }
+
+        // --- Run flow ---
+        string RoomClearedMessage { get; }
+        string RunVictoryMessage { get; }
+        string RunDefeatMessage { get; }
     }
 }
