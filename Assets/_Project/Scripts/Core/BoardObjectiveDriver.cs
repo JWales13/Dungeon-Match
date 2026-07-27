@@ -5,34 +5,39 @@ using UnityEngine;
 namespace Game.Core
 {
     /// <summary>
-    /// Translates raw Board events into "a move fully resolved, N tiles were
-    /// cleared" calls on an IBoardObjective. This is the single wiring point
-    /// between the grid and the win/lose rule, so neither has to know about
-    /// the other. One responsibility: count tiles per move and report it.
+    /// Translates raw Board events into a per-move MoveOutcome and reports it to
+    /// an IBoardObjective. Reads each matched tile's color during the match
+    /// event (before the board clears it), so objectives/relics can award
+    /// color- and size-based bonuses. One responsibility: build the outcome and
+    /// report it.
     /// </summary>
     public class BoardObjectiveDriver
     {
+        private readonly Board _board;
         private readonly IBoardObjective _objective;
-        private int _tilesClearedThisMove;
+        private readonly MoveOutcomeBuilder _builder = new MoveOutcomeBuilder();
 
         public BoardObjectiveDriver(Board board, IBoardObjective objective)
         {
-            if (board == null) throw new ArgumentNullException(nameof(board));
+            _board = board ?? throw new ArgumentNullException(nameof(board));
             _objective = objective ?? throw new ArgumentNullException(nameof(objective));
 
-            board.TilesMatched += HandleTilesMatched;
-            board.BoardSettled += HandleBoardSettled;
+            _board.TilesMatched += HandleTilesMatched;
+            _board.BoardSettled += HandleBoardSettled;
         }
 
         private void HandleTilesMatched(IReadOnlyList<Vector2Int> matchedCells)
         {
-            _tilesClearedThisMove += matchedCells.Count;
+            foreach (Vector2Int cell in matchedCells)
+            {
+                _builder.Add(_board.GetTile(cell).Type);
+            }
         }
 
         private void HandleBoardSettled()
         {
-            _objective.RegisterResolvedMove(_tilesClearedThisMove);
-            _tilesClearedThisMove = 0;
+            _objective.RegisterResolvedMove(_builder.Build());
+            _builder.Reset();
         }
     }
 }

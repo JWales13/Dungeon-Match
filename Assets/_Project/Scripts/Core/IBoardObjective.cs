@@ -17,8 +17,8 @@ namespace Game.Core
 
         /// <summary>
         /// Called once per fully-resolved player move (after all cascades
-        /// settle), with the total number of tiles cleared during that move.
+        /// settle), with a breakdown of what was cleared during that move.
         /// </summary>
-        void RegisterResolvedMove(int tilesClearedThisMove);
+        void RegisterResolvedMove(MoveOutcome move);
     }
 }

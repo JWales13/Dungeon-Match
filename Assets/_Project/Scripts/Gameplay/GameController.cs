@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Game.Core;
@@ -6,10 +7,10 @@ namespace Game.Gameplay
 {
     /// <summary>
     /// Composition root and run orchestrator. Builds a Run from Inspector
-    /// tuning, loads each room (board + combat objective + views), and reacts
-    /// to room outcomes: advance to the next room, win the run, or lose it.
-    /// Domain objects (Run, Board, MonsterCombatObjective) hold the rules;
-    /// this class only wires and sequences them.
+    /// tuning, loads each room (board + relic-aware combat objective + views),
+    /// and drives the flow: on a room win, offer a relic reward and advance;
+    /// on the final win, win the run; on any loss, end it. Domain objects hold
+    /// the rules - this class only wires and sequences them.
     /// </summary>
     public class GameController : MonoBehaviour
     {
@@ -18,6 +19,7 @@ namespace Game.Gameplay
         [SerializeField] private InputController _inputController;
         [SerializeField] private CombatHudView _combatHudView;
         [SerializeField] private RunFlowView _runFlowView;
+        [SerializeField] private RelicRewardView _relicRewardView;
 
         [Header("Board size")]
         [SerializeField] private int _boardWidth = 8;
@@ -29,11 +31,19 @@ namespace Game.Gameplay
         [SerializeField] private int _healthIncreasePerRoom = 10;
         [SerializeField] private int _moveLimit = 15;
         [SerializeField] private int _damagePerTile = 1;
+        [SerializeField] private int _relicOptionsPerReward = 2;
+
+        private readonly System.Random _random = new System.Random();
 
         private Run _run;
         private Board _board;
         private MonsterCombatObjective _objective;
         private BoardObjectiveDriver _objectiveDriver;
+
+        private RelicSet _relics;
+        private List<IRelic> _relicPool;
+        private IReadOnlyList<IRelic> _pendingRelicOptions;
+
         private bool _acceptingInput;
 
         private void Start()
@@ -41,6 +51,7 @@ namespace Game.Gameplay
             _inputController.SwapRequested += HandleSwapRequested;
             _runFlowView.ContinuePressed += HandleContinuePressed;
             _runFlowView.RestartPressed += HandleRestartPressed;
+            _relicRewardView.RelicChosen += HandleRelicChosen;
 
             StartNewRun();
         }
@@ -58,14 +69,25 @@ namespace Game.Gameplay
                 _runFlowView.RestartPressed -= HandleRestartPressed;
             }
 
+            if (_relicRewardView != null)
+            {
+                _relicRewardView.RelicChosen -= HandleRelicChosen;
+            }
+
             UnsubscribeObjective();
         }
 
         private void StartNewRun()
         {
+            _relics = new RelicSet();
+            _relicPool = new List<IRelic>(RelicCatalog.CreateDefault());
             _run = new Run(BuildRooms());
+
             _runFlowView.HideRunEnd();
             _runFlowView.HideBetweenRooms();
+            _relicRewardView.Hide();
+            _runFlowView.ShowRelics(_relics.Relics);
+
             LoadCurrentRoom();
         }
 
@@ -87,7 +109,7 @@ namespace Game.Gameplay
 
             RoomDefinition room = _run.CurrentRoom;
             _board = new Board(_boardWidth, _boardHeight, new MatchFinder());
-            _objective = new MonsterCombatObjective(room.MonsterHealth, room.MoveLimit, room.DamagePerTile);
+            _objective = new MonsterCombatObjective(room.MonsterHealth, room.MoveLimit, room.DamagePerTile, _relics);
             _objectiveDriver = new BoardObjectiveDriver(_board, _objective);
             _objective.StatusChanged += HandleRoomStatusChanged;
 
@@ -106,8 +128,7 @@ namespace Game.Gameplay
             }
 
             _acceptingInput = false;
-            bool roomWon = status == ObjectiveStatus.Won;
-            _run.RegisterRoomResult(roomWon);
+            _run.RegisterRoomResult(won: status == ObjectiveStatus.Won);
 
             switch (_run.Status)
             {
@@ -118,10 +139,39 @@ namespace Game.Gameplay
                     _runFlowView.ShowRunResult(won: false);
                     break;
                 default:
-                    // Run still in progress => we advanced to the next room.
-                    _runFlowView.ShowBetweenRooms();
+                    OfferRelicRewardOrContinue();
                     break;
             }
+        }
+
+        private void OfferRelicRewardOrContinue()
+        {
+            _pendingRelicOptions = RelicRewardGenerator.PickOptions(_relicPool, _relicOptionsPerReward, _random);
+
+            if (_pendingRelicOptions.Count == 0)
+            {
+                _runFlowView.ShowBetweenRooms();
+                return;
+            }
+
+            _relicRewardView.Show(_pendingRelicOptions);
+        }
+
+        private void HandleRelicChosen(int optionIndex)
+        {
+            if (_pendingRelicOptions == null || optionIndex < 0 || optionIndex >= _pendingRelicOptions.Count)
+            {
+                return;
+            }
+
+            IRelic chosen = _pendingRelicOptions[optionIndex];
+            _relics.Add(chosen);
+            _relicPool.Remove(chosen);
+            _pendingRelicOptions = null;
+
+            _runFlowView.ShowRelics(_relics.Relics);
+            _relicRewardView.Hide();
+            LoadCurrentRoom();
         }
 
         private void HandleContinuePressed()

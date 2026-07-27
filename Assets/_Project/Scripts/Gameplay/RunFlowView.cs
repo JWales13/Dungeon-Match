@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Game.Core;
 using Game.Presentation;
 
 namespace Game.Gameplay
@@ -17,6 +19,8 @@ namespace Game.Gameplay
     {
         [Header("Always visible")]
         [SerializeField] private TMP_Text _roomCounterText;
+        [Tooltip("Optional. Lists the relics the player currently holds.")]
+        [SerializeField] private TMP_Text _relicsText;
 
         [Header("Between-rooms panel")]
         [SerializeField] private GameObject _betweenRoomsPanel;
@@ -49,6 +53,29 @@ namespace Game.Gameplay
         public void ShowRoomCounter(int roomNumber, int totalRooms)
         {
             _roomCounterText.text = $"Room {roomNumber} / {totalRooms}";
+        }
+
+        /// <summary>Optional relic list; safely does nothing if no text is wired.</summary>
+        public void ShowRelics(IReadOnlyList<IRelic> relics)
+        {
+            if (_relicsText == null)
+            {
+                return;
+            }
+
+            if (relics.Count == 0)
+            {
+                _relicsText.text = "Relics: none";
+                return;
+            }
+
+            var names = new List<string>();
+            foreach (IRelic relic in relics)
+            {
+                names.Add(relic.DisplayName);
+            }
+
+            _relicsText.text = "Relics: " + string.Join(", ", names);
         }
 
         public void ShowBetweenRooms()
