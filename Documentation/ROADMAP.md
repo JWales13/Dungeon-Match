@@ -1,56 +1,51 @@
 # Revised Roadmap — DungeonVision
 
-Supersedes the original `ROADMAP.md` (which described the retired roguelite
-build). Sequenced to **prove the core loop first**, on a **clean base**, per the
-revised design doc.
+Supersedes the original `ROADMAP.md`. Sequenced to prove the core loop first,
+on a clean base. Status key: ✅ done · 🔨 in progress · ⬜ not started
 
-Status key: ✅ done · 🔨 in progress · ⬜ not started
+**Where we are:** Phases 0–3 complete. The board → ingredients → auto-crafted
+Dynamite chain runs end to end. Next is Phase 4, the last piece of the First
+Playable Milestone. Test suite: 30 EditMode tests green.
 
 ---
 
 ## The near-term goal: First Playable Milestone
 
-Everything up to and including **Phase 4** exists to answer one question: *is the
-core loop fun?* With placeholder art, a player should be able to, on a single
-floor:
+Everything up to and including **Phase 4** answers one question: *is the core
+loop fun?* With placeholder art, a player should be able to, on a single floor:
 
 1. Make power tiles by matching 4+/shapes.
 2. Detonate them to damage the monster **and** harvest color-matched ingredients.
-3. Craft a booster (Stick of Dynamite) at one station from those ingredients + a
-   timer.
+3. Have a station auto-craft a booster (Dynamite) from those ingredients + time.
 4. Bring it into the next attempt and set it off.
 
-If that loop feels good, the rest is scaffolding worth building. If it doesn't,
-we learn it in week one, not week six.
+Steps 1–3 are done (Phases 1–3). Step 4 is Phase 4.
 
 ---
 
 ## Phases
 
-### ⬜ Phase 0 — Cleanup (clean base)
-Remove the retired roguelite systems so we build on a tidy foundation.
-- Retire the relic reward flow (`RelicRewardView`, `RelicRewardGenerator`,
-  `RelicCatalog`) and multi-room `Run` sequencing (`Run`, run-level win/lose).
-- Keep board, combat objective, theme, and the save/catalog patterns.
-- Small, self-contained commit.
+### ✅ Phase 0 — Cleanup
+Stripped the retired roguelite systems (relic reward flow, multi-room Run) back
+to a single-floor combat base. Kept board, combat, theme.
 
-### ⬜ Phase 1 — Power tiles (board upgrade)
-- Extend `MatchFinder` to detect 4+, L, and T matches.
-- Create power tiles on those matches; detonation = damage + clear nearby tiles.
-- Ingredient-drop hook stubbed for Phase 2.
-- EditMode tests for shape detection and detonation.
+### ✅ Phase 1 — Power tiles
+- MatchFinder returns classified MatchGroups (runs + 2x2 squares).
+- Horizontal 4 → column-clearer, vertical 4 → row-clearer, 2x2 → mortar.
+- Power tiles are inert until moved (swapped), then detonate; detonations chain.
+- Power tiles spawn at the swap cell (stay where dropped). Rendered as
+  brighter, shaped tiles.
 
-### ⬜ Phase 2 — Ingredients & harvest
-- Four ingredient types, one per color.
-- Detonating a power tile yields its color's ingredient.
-- Persistent ingredient inventory (extend the save system); banks win or lose.
-- Tests for harvest + persistence.
+### ✅ Phase 2 — Ingredients & harvest
+- Four ingredients, one per color (Gunpowder/Toxic Goo/Live Wire/Rations).
+- Detonating a power tile yields its color's ingredient (chains included).
+- Persistent ingredient stash (JSON save), banks win or lose. On-screen counter.
 
-### ⬜ Phase 3 — First Producer station
-- One station (Bomb Bench → Dynamite): ingredient + timer production, small
-  buffer, collect finished booster.
-- Minimal UI (a single button/panel — full base comes in Phase 5).
-- Tests for the production rule (ingredients + time gating, buffer cap).
+### ✅ Phase 3 — First Producer station (Bomb Bench)
+- ProducerStation: Gunpowder + time → Dynamite, buffer cap, Tick-driven.
+- Boosters auto-deposit into a persistent stash (no manual collect); buffer cap
+  reserved as the future offline-production cap.
+- StationView shows production status + stock. BoosterInventory persisted.
 
 ### ⬜ Phase 4 — Loadout & in-floor boosters  → **FIRST PLAYABLE MILESTONE**
 - Bring one Dynamite into a floor; tap to place/detonate.
@@ -58,46 +53,41 @@ Remove the retired roguelite systems so we build on a tidy foundation.
 - **Stop and playtest. Decide the loop is fun before proceeding.**
 
 ### ⬜ Phase 5 — The Green Room (base view)
-- Fixed station slots; build/upgrade with Salvage; visible upgrade art.
-- Add the remaining three producers (Goo Lab, Wire Rig, Mess Kit) and their
-  boosters (Acid Vial, Overcharge, Energy Drink).
-- Loadout = one of each owned.
+- Move the Bomb Bench (and its status/stock) to a hub between floors; station
+  ticks there and offline. Fixed station slots; build/upgrade with gold; visible
+  upgrade art. Add the other three producers + boosters. "Descend" button to
+  launch a floor (replaces the Play Again scaffold).
 
 ### ⬜ Phase 6 — Procedural floors & difficulty tiers
-- Depth-driven floor generation (HP, moves, board, obstacle density).
-- Difficulty tiers: Regular / Main Event (hard) / Sweeps Week (super-hard);
-  rare-ingredient drops on the hard tiers.
-- Introduce board obstacles gradually (locked tiles, crates, armored monsters).
-- Salvage rewards scale with depth (first-clear only).
+- Depth-driven floor generation. Tiers: Regular / Main Event (hard) / Sweeps
+  Week (super-hard), with rare-ingredient drops. Board obstacles introduced
+  gradually. Gold rewards scale with depth (first clear).
 
 ### ⬜ Phase 7 — Daily Utilities & economy
 - Daily-Utility stations (Mess Hall, Cot, Vending Machine) with once/day
-  cooldowns and gem bypass — unifying with Producers under one Station model.
-- Sponsor Bucks (premium): skip timers, top up ingredients, buy Salvage.
-- Rewarded-ad hooks: rush a timer, double a floor's harvest, daily free claim.
+  cooldowns, gem bypass. Sponsor Bucks (gems): skip timers, top up ingredients,
+  buy gold. Rewarded-ad hooks: rush a timer, double a floor's harvest, daily
+  free claim.
 
 ### ⬜ Phase 8 — Theme & juice pass
-- Buck Diamond host voice, sponsor-parody item flavor, achievement pops.
-- Animation/particles for matches, detonations, damage; sound; music bed.
-- Real art within the existing code-driven theme system.
+- Buck Diamond host voice, sponsor flavor, achievement pops. Animation/particles
+  for matches/detonations/damage; sound; music. Real art within the theme.
 
 ### ⬜ Phase 9 — Demo hardening
-- Device build (Android/iOS), aspect ratios, performance.
-- Economy and difficulty tuning; playtest; fix top bugs.
+- Device build (Android/iOS), aspect ratios, performance. Economy/difficulty
+  tuning; playtest; fix top bugs.
 
 ---
 
-## Honest scope note on timeline
+## Scope note on timeline
 
-The original target was a demo in 4–6 weeks. That target is realistic for the
-**First Playable Milestone (Phases 0–4)** — the core-loop proof. The *fuller*
-demo (base, procedural depth, economy, daily utilities, theme pass) is a bigger
-game than the retired roguelite MVP, and solo is more realistically **~10–14
-weeks part-time**. Recommended framing: treat Phases 0–4 as the near-term goal
-and the fun gate; re-plan the back half once the loop is proven and you've felt
-the real pace.
+Original target: demo in 4–6 weeks. Realistic for the **First Playable
+Milestone (Phases 0–4)** — the core-loop proof. The fuller demo (Green Room,
+procedural depth, economy, daily utilities, theme) is more like **~10–14 weeks
+part-time** solo. Treat Phases 0–4 as the near-term goal and re-plan the back
+half once the loop is proven.
 
-## Process (unchanged)
+## Process
 - Work phase by phase; keep the game playable at the end of each.
 - Commit at the end of every phase (summary + description provided each time).
 - Every new rule class in `Game.Core` ships with EditMode tests.
