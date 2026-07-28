@@ -55,6 +55,17 @@ namespace Game.Presentation
             }
         }
 
+        // Currencies
+        public string GetCurrencyName(CurrencyType currency)
+        {
+            switch (currency)
+            {
+                case CurrencyType.Gold:         return "Gold";
+                case CurrencyType.PrizeVoucher: return "Prize Vouchers";
+                default:                        return "?";
+            }
+        }
+
         // Power tiles
         public float PowerTileHighlightAmount => 0.45f;
         public float PowerTileThickness => 0.4f;

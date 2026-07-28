@@ -1,18 +1,15 @@
 using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEngine.SceneManagement;
 using Game.Core;
 
 namespace Game.Gameplay
 {
     /// <summary>
-    /// Single-floor player plus the (temporary in-combat) Bomb Bench and the
-    /// booster loadout. Loads the ingredient and booster stashes once, ticks the
-    /// station each frame, harvests ingredients from detonations, and saves both
-    /// stashes at floor end. Boosters auto-deposit as they finish; the player
-    /// can bring one Dynamite into a floor and tap a tile to set it off.
-    ///
-    /// The station/loadout live on the combat screen only because there's no
-    /// Green Room yet (Phase 5).
+    /// The Floor scene's controller: plays one combat floor. Loads the stashes
+    /// (harvest adds ingredients; the loadout spends boosters), runs the board
+    /// and the in-floor Dynamite, and on floor end saves and returns to the
+    /// Green Room. Crafting (the Bomb Bench) lives in the Green Room now.
     /// </summary>
     public class GameController : MonoBehaviour
     {
@@ -25,7 +22,6 @@ namespace Game.Gameplay
         [SerializeField] private FloorResultView _floorResultView;
 
         [SerializeField] private IngredientHudView _ingredientHudView;
-        [SerializeField] private StationView _stationView;
         [SerializeField] private BoosterLoadoutView _loadoutView;
 
         [Header("Board size")]
@@ -38,16 +34,10 @@ namespace Game.Gameplay
         [SerializeField] private int _damagePerTile = 1;
         [SerializeField] private int _ingredientsPerDetonation = 2;
 
-        [Header("Bomb Bench")]
-        [SerializeField] private int _bombBenchIngredientCost = 3;
-        [SerializeField] private float _bombBenchProductionSeconds = 10f;
-        [SerializeField] private int _bombBenchBufferCapacity = 2;
-
         private IngredientInventoryRepository _ingredientRepository;
         private IngredientInventory _inventory;
         private BoosterInventoryRepository _boosterRepository;
         private BoosterInventory _boosters;
-        private ProducerStation _bombBench;
 
         private Board _board;
         private MonsterCombatObjective _objective;
@@ -74,36 +64,9 @@ namespace Game.Gameplay
             _boosters = _boosterRepository.Load();
             _boosters.Changed += RefreshLoadout;
 
-            _bombBench = new ProducerStation(
-                BoosterType.Dynamite, TileType.Red,
-                _bombBenchIngredientCost, _bombBenchProductionSeconds, _bombBenchBufferCapacity, _inventory);
-
             _ingredientHudView.Initialize(_inventory);
-            _stationView.Initialize(_bombBench, _boosters);
 
             LoadFloor();
-        }
-
-        private void Update()
-        {
-            if (_bombBench == null)
-            {
-                return;
-            }
-
-            _bombBench.Tick(Time.deltaTime);
-            AutoCollect();
-        }
-
-        /// <summary>Boosters deposit into the stash automatically as they finish - no manual collect.</summary>
-        private void AutoCollect()
-        {
-            int collected = _bombBench.Collect();
-            if (collected > 0)
-            {
-                _boosters.Add(BoosterType.Dynamite, collected);
-                _boosterRepository.Save(_boosters);
-            }
         }
 
         private void OnDestroy()
@@ -220,8 +183,9 @@ namespace Game.Gameplay
 
         private void HandlePlayAgain()
         {
-            _floorResultView.HideResult();
-            LoadFloor();
+            // Floor over -> back to the Green Room hub. Stashes were already
+            // saved in HandleObjectiveStatusChanged, so state carries over.
+            SceneManager.LoadScene(SceneNames.GreenRoom);
         }
 
         private void SaveStashes()

@@ -29,6 +29,9 @@ namespace Game.Presentation
         // The display name for a crafted booster.
         string GetBoosterName(BoosterType type);
 
+        // --- Currencies ---
+        string GetCurrencyName(CurrencyType currency);
+
         // --- Power tiles ---
         // How far a power tile's color is blended toward MatchedFlashColor (0-1).
         float PowerTileHighlightAmount { get; }
