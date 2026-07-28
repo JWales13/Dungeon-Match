@@ -1,110 +1,65 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
-using Game.Core;
 using Game.Presentation;
 
 namespace Game.Gameplay
 {
     /// <summary>
-    /// Owns all run-flow UI: the persistent "Room X / Y" counter, the
-    /// between-rooms panel (with a Continue button), and the run-end panel
-    /// (with a Restart button). It only shows/hides and reports button presses;
-    /// GameController decides what actually happens. Result strings/colors come
-    /// from the theme.
+    /// Single-floor result panel: shows VICTORY/ELIMINATED and a button to try
+    /// a fresh floor. Trimmed in the Phase 0 cleanup to just the result flow
+    /// (the old room-counter and between-rooms pieces belonged to the retired
+    /// multi-room run). Null-safe so a missing reference logs nothing worse than
+    /// an unresponsive button.
     /// </summary>
     public class RunFlowView : MonoBehaviour
     {
-        [Header("Always visible")]
-        [SerializeField] private TMP_Text _roomCounterText;
-        [Tooltip("Optional. Lists the relics the player currently holds.")]
-        [SerializeField] private TMP_Text _relicsText;
-
-        [Header("Between-rooms panel")]
-        [SerializeField] private GameObject _betweenRoomsPanel;
-        [SerializeField] private TMP_Text _betweenRoomsText;
-        [SerializeField] private Button _continueButton;
-
-        [Header("Run-end panel")]
         [SerializeField] private GameObject _runEndPanel;
         [SerializeField] private TMP_Text _runEndText;
         [SerializeField] private Button _restartButton;
 
-        public event Action ContinuePressed;
         public event Action RestartPressed;
 
         private void Awake()
         {
-            _continueButton.onClick.AddListener(RaiseContinue);
-            _restartButton.onClick.AddListener(RaiseRestart);
+            if (_restartButton != null)
+            {
+                _restartButton.onClick.AddListener(RaiseRestart);
+            }
 
-            HideBetweenRooms();
             HideRunEnd();
         }
 
         private void OnDestroy()
         {
-            _continueButton.onClick.RemoveListener(RaiseContinue);
-            _restartButton.onClick.RemoveListener(RaiseRestart);
-        }
-
-        public void ShowRoomCounter(int roomNumber, int totalRooms)
-        {
-            _roomCounterText.text = $"Room {roomNumber} / {totalRooms}";
-        }
-
-        /// <summary>Optional relic list; safely does nothing if no text is wired.</summary>
-        public void ShowRelics(IReadOnlyList<IRelic> relics)
-        {
-            if (_relicsText == null)
+            if (_restartButton != null)
             {
-                return;
+                _restartButton.onClick.RemoveListener(RaiseRestart);
             }
-
-            if (relics.Count == 0)
-            {
-                _relicsText.text = "Relics: none";
-                return;
-            }
-
-            var names = new List<string>();
-            foreach (IRelic relic in relics)
-            {
-                names.Add(relic.DisplayName);
-            }
-
-            _relicsText.text = "Relics: " + string.Join(", ", names);
-        }
-
-        public void ShowBetweenRooms()
-        {
-            _betweenRoomsText.text = Theme.Current.RoomClearedMessage;
-            _betweenRoomsPanel.SetActive(true);
-        }
-
-        public void HideBetweenRooms()
-        {
-            _betweenRoomsPanel.SetActive(false);
         }
 
         public void ShowRunResult(bool won)
         {
-            ITheme theme = Theme.Current;
-            _runEndText.text = won ? theme.RunVictoryMessage : theme.RunDefeatMessage;
-            _runEndText.color = won ? theme.VictoryColor : theme.DefeatColor;
-            _runEndPanel.SetActive(true);
+            if (_runEndText != null)
+            {
+                ITheme theme = Theme.Current;
+                _runEndText.text = won ? theme.RunVictoryMessage : theme.RunDefeatMessage;
+                _runEndText.color = won ? theme.VictoryColor : theme.DefeatColor;
+            }
+
+            if (_runEndPanel != null)
+            {
+                _runEndPanel.SetActive(true);
+            }
         }
 
         public void HideRunEnd()
         {
-            _runEndPanel.SetActive(false);
-        }
-
-        private void RaiseContinue()
-        {
-            ContinuePressed?.Invoke();
+            if (_runEndPanel != null)
+            {
+                _runEndPanel.SetActive(false);
+            }
         }
 
         private void RaiseRestart()

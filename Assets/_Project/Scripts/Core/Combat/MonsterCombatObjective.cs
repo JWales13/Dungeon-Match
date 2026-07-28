@@ -4,13 +4,13 @@ using UnityEngine;
 namespace Game.Core
 {
     /// <summary>
-    /// The MVP combat rule: drain a monster's HP by clearing tiles within a
-    /// move limit. Win at 0 HP; lose when moves run out first. Relics (held in
-    /// a run-scoped RelicSet) adjust the move limit at construction and the
-    /// damage of each resolved move - combat math stays in one place while the
-    /// modifiers stay open-ended.
+    /// The combat rule: drain a monster's HP by clearing tiles within a move
+    /// limit. Win at 0 HP; lose when moves run out first. Pure C# and unit
+    /// tested directly (MonsterCombatObjectiveTests).
     ///
-    /// Pure C# and unit tested directly (MonsterCombatObjectiveTests).
+    /// Note: relic/booster damage modifiers were removed in the Phase 0 cleanup
+    /// (DungeonVision pivot). Crafted-booster effects will re-enter combat in a
+    /// later phase via the new station/booster system, not the old RelicSet.
     /// </summary>
     public class MonsterCombatObjective : IBoardObjective
     {
@@ -26,20 +26,17 @@ namespace Game.Core
         public event Action<int, int> MovesChanged;   // (remaining, limit)
 
         private readonly int _damagePerTile;
-        private readonly RelicSet _relics;
 
-        public MonsterCombatObjective(int monsterHealth, int moveLimit, int damagePerTile = 1, RelicSet relics = null)
+        public MonsterCombatObjective(int monsterHealth, int moveLimit, int damagePerTile = 1)
         {
             if (monsterHealth <= 0) throw new ArgumentOutOfRangeException(nameof(monsterHealth));
             if (moveLimit <= 0) throw new ArgumentOutOfRangeException(nameof(moveLimit));
             if (damagePerTile <= 0) throw new ArgumentOutOfRangeException(nameof(damagePerTile));
 
-            _relics = relics ?? new RelicSet();
             _damagePerTile = damagePerTile;
-
             MaxHealth = monsterHealth;
             CurrentHealth = monsterHealth;
-            MoveLimit = Mathf.Max(1, _relics.ModifyMoveLimit(moveLimit));
+            MoveLimit = moveLimit;
         }
 
         public void RegisterResolvedMove(MoveOutcome move)
@@ -49,10 +46,7 @@ namespace Game.Core
                 return;
             }
 
-            int baseDamage = move.Total * _damagePerTile;
-            int finalDamage = _relics.ModifyMoveDamage(baseDamage, move);
-
-            ApplyDamage(finalDamage);
+            ApplyDamage(move.Total * _damagePerTile);
             ConsumeMove();
             EvaluateOutcome();
         }
