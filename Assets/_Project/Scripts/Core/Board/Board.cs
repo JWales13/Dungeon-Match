@@ -141,7 +141,7 @@ namespace Game.Core
             {
                 foreach (Vector2Int cell in group.Cells)
                 {
-                    if (!spawns.ContainsKey(cell) && clearedSet.Add(cell))
+                    if (clearedSet.Add(cell))
                     {
                         cleared.Add(cell);
                     }
@@ -158,13 +158,17 @@ namespace Game.Core
                 _grid[cell.x, cell.y] = Tile.Empty;
             }
 
+            CollapseColumns();
+            RefillEmptyTiles();
+
+            // Stamp each created power tile onto its spawn cell (where the player
+            // dropped the tile), overwriting whatever refilled there. Doing this
+            // AFTER gravity keeps the power tile exactly at the swap spot instead
+            // of falling through the gap left by its own (vertical) match.
             foreach (KeyValuePair<Vector2Int, Tile> spawn in spawns)
             {
                 _grid[spawn.Key.x, spawn.Key.y] = spawn.Value;
             }
-
-            CollapseColumns();
-            RefillEmptyTiles();
         }
 
         private static bool TryGetPowerSpawn(MatchGroup group, out PowerTileKind kind)

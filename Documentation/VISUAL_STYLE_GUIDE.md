@@ -74,6 +74,14 @@ apply it, rather than setting the font per-object in the Inspector.
 | Cell size   | 1.0   | World-unit distance between tile centers           |
 | Tile scale  | 0.9   | Tile sprite scale; the 0.1 gap reads as a grid line|
 
+## Power tiles
+
+| Token                    | Value | Use                                                        |
+|--------------------------|-------|------------------------------------------------------------|
+| Power tile highlight     | 0.45  | How far a power tile's color blends toward white (0-1)     |
+| Power tile thickness     | 0.40  | The thin edge of a power-tile bar; long edge = Tile scale  |
+
+
 ## Result strings
 
 Player-facing copy also lives in the theme (so tone/wording is centralized and

@@ -32,6 +32,10 @@ namespace Game.Presentation
 
         public Color MatchedFlashColor => Color.white;
 
+        // Power tiles
+        public float PowerTileHighlightAmount => 0.45f;
+        public float PowerTileThickness => 0.4f;
+
         // HUD text
         public Color HudTextColor => new Color32(237, 237, 237, 255);   // #EDEDED off-white
         public float HudLabelFontSize => 28f;

@@ -21,6 +21,14 @@ namespace Game.Presentation
         Color GetTileColor(TileType type);
         Color MatchedFlashColor { get; }
 
+        // --- Power tiles ---
+        // How far a power tile's color is blended toward MatchedFlashColor (0-1).
+        float PowerTileHighlightAmount { get; }
+        // The "thin" edge of a power tile's shape (its long edge is TileScale),
+        // used to draw column-clearers as vertical bars, row-clearers as
+        // horizontal bars, and mortars as small squares.
+        float PowerTileThickness { get; }
+
         // --- HUD text ---
         Color HudTextColor { get; }
         float HudLabelFontSize { get; }

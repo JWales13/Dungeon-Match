@@ -101,8 +101,7 @@ namespace Game.Gameplay
         {
             Vector3 position = new Vector3(x * _cellSize, y * _cellSize, 0f);
             TileView view = Instantiate(_tilePrefab, position, Quaternion.identity, transform);
-            view.transform.localScale = Vector3.one * Theme.Current.TileScale;
-            view.SetType(_board.GetTile(new Vector2Int(x, y)).Type);
+            view.Display(_board.GetTile(new Vector2Int(x, y)));
             _tileViews[x, y] = view;
         }
 
@@ -125,7 +124,7 @@ namespace Game.Gameplay
             {
                 for (int y = 0; y < _board.Height; y++)
                 {
-                    _tileViews[x, y].SetType(_board.GetTile(new Vector2Int(x, y)).Type);
+                    _tileViews[x, y].Display(_board.GetTile(new Vector2Int(x, y)));
                 }
             }
         }
