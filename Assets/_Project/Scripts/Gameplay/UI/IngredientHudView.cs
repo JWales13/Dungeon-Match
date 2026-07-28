@@ -25,8 +25,21 @@ namespace Game.Gameplay
         {
             Unsubscribe();
             _inventory = inventory;
+            ApplyStyle();
             _inventory.Changed += Refresh;
             Refresh();
+        }
+
+        private void ApplyStyle()
+        {
+            if (_text == null)
+            {
+                return;
+            }
+
+            ITheme theme = Theme.Current;
+            _text.fontSize = theme.CaptionFontSize;
+            _text.color = theme.HudTextColor;
         }
 
         private void OnDestroy()

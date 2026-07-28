@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 using Game.Core;
 
 namespace Game.Gameplay
@@ -7,7 +8,7 @@ namespace Game.Gameplay
     /// Single-floor player plus the (temporary in-combat) Bomb Bench. Loads the
     /// ingredient and booster stashes once, ticks the station each frame,
     /// harvests ingredients from detonations, and saves both stashes at floor
-    /// end (win or lose). Collecting from the bench banks Dynamite immediately.
+    /// end (win or lose). Boosters auto-deposit as they finish.
     ///
     /// The station lives on the combat screen only because there's no Green Room
     /// yet (Phase 5); it will move to the hub then.
@@ -18,7 +19,10 @@ namespace Game.Gameplay
         [SerializeField] private BoardView _boardView;
         [SerializeField] private InputController _inputController;
         [SerializeField] private CombatHudView _combatHudView;
-        [SerializeField] private RunFlowView _runFlowView;
+
+        [FormerlySerializedAs("_runFlowView")]
+        [SerializeField] private FloorResultView _floorResultView;
+
         [SerializeField] private IngredientHudView _ingredientHudView;
         [SerializeField] private StationView _stationView;
 
@@ -52,7 +56,7 @@ namespace Game.Gameplay
         private void Awake()
         {
             _inputController.SwapRequested += HandleSwapRequested;
-            _runFlowView.RestartPressed += HandleRestartPressed;
+            _floorResultView.PlayAgainPressed += HandlePlayAgain;
         }
 
         private void Start()
@@ -101,9 +105,9 @@ namespace Game.Gameplay
                 _inputController.SwapRequested -= HandleSwapRequested;
             }
 
-            if (_runFlowView != null)
+            if (_floorResultView != null)
             {
-                _runFlowView.RestartPressed -= HandleRestartPressed;
+                _floorResultView.PlayAgainPressed -= HandlePlayAgain;
             }
 
             UnsubscribeObjective();
@@ -121,7 +125,7 @@ namespace Game.Gameplay
 
             _boardView.Initialize(_board);
             _combatHudView.Initialize(_objective);
-            _runFlowView.HideRunEnd();
+            _floorResultView.HideResult();
 
             _acceptingInput = true;
         }
@@ -135,12 +139,12 @@ namespace Game.Gameplay
 
             _acceptingInput = false;
             SaveStashes();
-            _runFlowView.ShowRunResult(won: status == ObjectiveStatus.Won);
+            _floorResultView.ShowResult(won: status == ObjectiveStatus.Won);
         }
 
-        private void HandleRestartPressed()
+        private void HandlePlayAgain()
         {
-            _runFlowView.HideRunEnd();
+            _floorResultView.HideResult();
             LoadFloor();
         }
 

@@ -62,6 +62,7 @@ namespace Game.Presentation
         // HUD text
         public Color HudTextColor => new Color32(237, 237, 237, 255);   // #EDEDED off-white
         public float HudLabelFontSize => 28f;
+        public float CaptionFontSize => 22f;
 
         // Result banner
         public float ResultFontSize => 60f;
@@ -70,9 +71,8 @@ namespace Game.Presentation
         public string VictoryMessage => "VICTORY";
         public string DefeatMessage => "ELIMINATED";
 
-        // Run flow
-        public string RoomClearedMessage => "ROOM CLEARED";
-        public string RunVictoryMessage => "YOU SURVIVED";
-        public string RunDefeatMessage => "ELIMINATED";
+        // Floor result
+        public string FloorVictoryMessage => "YOU SURVIVED";
+        public string FloorDefeatMessage => "ELIMINATED";
     }
 }

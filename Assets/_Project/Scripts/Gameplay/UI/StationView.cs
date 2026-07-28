@@ -25,8 +25,27 @@ namespace Game.Gameplay
             _station = station;
             _boosters = boosters;
 
+            ApplyStyle();
             _boosters.Changed += RefreshStock;
             RefreshStock();
+        }
+
+        private void ApplyStyle()
+        {
+            ITheme theme = Theme.Current;
+            StyleLabel(_statusText, theme);
+            StyleLabel(_stockText, theme);
+        }
+
+        private static void StyleLabel(TMP_Text label, ITheme theme)
+        {
+            if (label == null)
+            {
+                return;
+            }
+
+            label.fontSize = theme.CaptionFontSize;
+            label.color = theme.HudTextColor;
         }
 
         private void OnDestroy()

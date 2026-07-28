@@ -39,7 +39,8 @@ namespace Game.Presentation
 
         // --- HUD text ---
         Color HudTextColor { get; }
-        float HudLabelFontSize { get; }
+        float HudLabelFontSize { get; }   // primary labels (HP, moves)
+        float CaptionFontSize { get; }     // secondary labels (ingredient counter, station)
 
         // --- Result banner (single board) ---
         float ResultFontSize { get; }
@@ -48,9 +49,8 @@ namespace Game.Presentation
         string VictoryMessage { get; }
         string DefeatMessage { get; }
 
-        // --- Run flow ---
-        string RoomClearedMessage { get; }
-        string RunVictoryMessage { get; }
-        string RunDefeatMessage { get; }
+        // --- Floor result ---
+        string FloorVictoryMessage { get; }
+        string FloorDefeatMessage { get; }
     }
 }
