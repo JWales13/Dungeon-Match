@@ -5,22 +5,20 @@ using Game.Core;
 namespace Game.Tests
 {
     /// <summary>
-    /// These run in the Unity Test Runner (EditMode) in milliseconds, with no
-    /// scene, no play mode, and no rendering - because Board has zero
-    /// dependency on any of that. This is the payoff of the Core/Gameplay
-    /// split: the riskiest logic (match/cascade rules) is verifiable on its
-    /// own.
+    /// Board-level invariants that hold regardless of power tiles: a clean
+    /// start, adjacency rules, and no empty cells left after a move. All run in
+    /// EditMode with no scene.
     /// </summary>
     public class BoardTests
     {
         [Test]
-        public void Constructor_FillsGrid_WithNoImmediateMatches()
+        public void Constructor_FillsGrid_WithNoStartingMatches()
         {
             var board = new Board(8, 8, new MatchFinder(), randomSeed: 1);
 
             var matches = new MatchFinder().FindMatches(GetGridSnapshot(board));
 
-            Assert.AreEqual(0, matches.Count, "A freshly created board should never start with a pre-existing match.");
+            Assert.AreEqual(0, matches.Count, "A freshly created board should never start with a match (line or square).");
         }
 
         [Test]
@@ -30,11 +28,11 @@ namespace Game.Tests
 
             bool result = board.TrySwap(new Vector2Int(0, 0), new Vector2Int(2, 2));
 
-            Assert.IsFalse(result, "Only orthogonally adjacent cells should be swappable.");
+            Assert.IsFalse(result);
         }
 
         [Test]
-        public void TrySwap_NeverLeavesEmptyCellsOnTheBoard()
+        public void TrySwap_NeverLeavesEmptyCells()
         {
             var board = new Board(8, 8, new MatchFinder(), randomSeed: 3);
 
@@ -44,8 +42,7 @@ namespace Game.Tests
             {
                 for (int y = 0; y < board.Height; y++)
                 {
-                    bool isEmpty = board.GetTile(new Vector2Int(x, y)).IsEmpty;
-                    Assert.IsFalse(isEmpty, $"Cell ({x},{y}) was left empty after a swap; refill logic should always backfill.");
+                    Assert.IsFalse(board.GetTile(new Vector2Int(x, y)).IsEmpty, $"Cell ({x},{y}) was left empty.");
                 }
             }
         }

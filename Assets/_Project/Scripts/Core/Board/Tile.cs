@@ -1,20 +1,24 @@
 namespace Game.Core
 {
     /// <summary>
-    /// An immutable value representing a single board cell's contents.
-    /// Immutability keeps board mutation logic centralized in Board instead of
-    /// scattered across anything that happens to hold a reference to a tile.
+    /// An immutable board cell value: a color (Type) and an optional power
+    /// (Power). A normal tile has Power == None. A power tile still carries a
+    /// color but is inert to matching until the player moves it.
     /// </summary>
     public readonly struct Tile
     {
         public static readonly Tile Empty = new Tile(TileType.None);
 
         public TileType Type { get; }
-        public bool IsEmpty => Type == TileType.None;
+        public PowerTileKind Power { get; }
 
-        public Tile(TileType type)
+        public bool IsEmpty => Type == TileType.None;
+        public bool IsPowerTile => Power != PowerTileKind.None;
+
+        public Tile(TileType type, PowerTileKind power = PowerTileKind.None)
         {
             Type = type;
+            Power = power;
         }
     }
 }

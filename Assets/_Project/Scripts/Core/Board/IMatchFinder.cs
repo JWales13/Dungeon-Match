@@ -1,15 +1,14 @@
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace Game.Core
 {
     /// <summary>
-    /// Finds matched tile groups on a grid. Extracted behind an interface so the
-    /// matching algorithm can be swapped (e.g. add diagonal matches, L/T shapes)
-    /// or mocked in tests without touching Board.
+    /// Finds match groups on a grid (straight runs of 3+ and 2x2 squares).
+    /// Behind an interface so the matching rules can be swapped or mocked
+    /// without touching Board.
     /// </summary>
     public interface IMatchFinder
     {
-        IReadOnlyList<Vector2Int> FindMatches(Tile[,] grid);
+        IReadOnlyList<MatchGroup> FindMatches(Tile[,] grid);
     }
 }

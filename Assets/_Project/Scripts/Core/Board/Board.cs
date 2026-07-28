@@ -6,29 +6,35 @@ using Random = System.Random;
 namespace Game.Core
 {
     /// <summary>
-    /// Owns the grid of tiles and every rule for mutating it: swapping,
-    /// clearing matches, collapsing gravity, and refilling. Pure C# - no
-    /// MonoBehaviour, no rendering, no input. That's what makes it unit
-    /// testable and safe to reuse if the presentation layer changes later.
+    /// Owns the grid and every rule for mutating it: swapping, creating power
+    /// tiles from large matches, detonating power tiles when the player moves
+    /// them (with chain reactions), clearing, gravity, and refill. Pure C# -
+    /// no MonoBehaviour, no rendering, no input - so all of it is unit tested.
+    ///
+    /// Events (unchanged contract for the view/harvest layers):
+    ///  - TilesSwapped(a, b): two cells exchanged (including a reverted swap).
+    ///  - TilesMatched(cells): cells that are about to be cleared this step. It
+    ///    fires BEFORE the cells are emptied, so listeners can read their colors
+    ///    from the grid (used for damage + ingredient harvest). "Matched" now
+    ///    means "cleared", covering both matches and power-tile detonations.
+    ///  - BoardSettled: all cascades from a move have finished resolving.
     /// </summary>
     public class Board
     {
         public int Width { get; }
         public int Height { get; }
 
-        /// <summary>Raised whenever two cells swap contents (including a reverted swap).</summary>
         public event Action<Vector2Int, Vector2Int> TilesSwapped;
-
-        /// <summary>Raised once per cascade step with the cells that just matched.</summary>
         public event Action<IReadOnlyList<Vector2Int>> TilesMatched;
-
-        /// <summary>Raised once all cascades from a swap have finished resolving.</summary>
         public event Action BoardSettled;
+
+        private static readonly IReadOnlyList<Vector2Int> NoCandidates = new List<Vector2Int>();
 
         private readonly Tile[,] _grid;
         private readonly IMatchFinder _matchFinder;
         private readonly Random _random;
 
+        /// <summary>Creates a randomly filled board with no starting matches.</summary>
         public Board(int width, int height, IMatchFinder matchFinder, int? randomSeed = null)
         {
             Width = width;
@@ -40,6 +46,17 @@ namespace Game.Core
             FillWithoutStartingMatches();
         }
 
+        /// <summary>Creates a board from an explicit grid (used by tests).</summary>
+        public Board(Tile[,] initialGrid, IMatchFinder matchFinder, int? randomSeed = null)
+        {
+            if (initialGrid == null) throw new ArgumentNullException(nameof(initialGrid));
+            _matchFinder = matchFinder ?? throw new ArgumentNullException(nameof(matchFinder));
+            _random = randomSeed.HasValue ? new Random(randomSeed.Value) : new Random();
+            Width = initialGrid.GetLength(0);
+            Height = initialGrid.GetLength(1);
+            _grid = (Tile[,])initialGrid.Clone();
+        }
+
         public Tile GetTile(Vector2Int position)
         {
             ThrowIfOutOfBounds(position);
@@ -48,62 +65,284 @@ namespace Game.Core
 
         public bool AreAdjacent(Vector2Int a, Vector2Int b)
         {
-            int manhattanDistance = Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y);
-            return manhattanDistance == 1;
+            return Mathf.Abs(a.x - b.x) + Mathf.Abs(a.y - b.y) == 1;
         }
 
         /// <summary>
-        /// Attempts to swap two adjacent cells. If the swap does not create a
-        /// match, it is reverted and this returns false. Otherwise all
-        /// resulting cascades are resolved before returning true.
+        /// Swaps two adjacent cells. If either is a power tile, the swap always
+        /// succeeds and the power tile detonates. Otherwise the swap must form a
+        /// match, or it is reverted and this returns false.
         /// </summary>
         public bool TrySwap(Vector2Int a, Vector2Int b)
         {
+            ThrowIfOutOfBounds(a);
+            ThrowIfOutOfBounds(b);
             if (!AreAdjacent(a, b))
             {
                 return false;
             }
 
-            SwapTiles(a, b);
+            bool involvesPower = _grid[a.x, a.y].IsPowerTile || _grid[b.x, b.y].IsPowerTile;
+            SwapCells(a, b);
             TilesSwapped?.Invoke(a, b);
 
-            var matches = _matchFinder.FindMatches(_grid);
-            if (matches.Count == 0)
+            if (involvesPower)
             {
-                SwapTiles(a, b);
+                var detonators = new List<Vector2Int>();
+                if (_grid[a.x, a.y].IsPowerTile) detonators.Add(a);
+                if (_grid[b.x, b.y].IsPowerTile) detonators.Add(b);
+                ResolveDetonation(detonators);
+                return true;
+            }
+
+            var groups = _matchFinder.FindMatches(_grid);
+            if (groups.Count == 0)
+            {
+                SwapCells(a, b);
                 TilesSwapped?.Invoke(a, b);
                 return false;
             }
 
-            ResolveMatches(matches);
+            RunMatchCascade(groups, new List<Vector2Int> { b, a });
             return true;
         }
 
-        private void ResolveMatches(IReadOnlyList<Vector2Int> matches)
+        // --- Match resolution (may create power tiles) ---
+
+        private void RunMatchCascade(IReadOnlyList<MatchGroup> groups, IReadOnlyList<Vector2Int> spawnCandidates)
         {
-            while (matches.Count > 0)
+            while (groups.Count > 0)
             {
-                TilesMatched?.Invoke(matches);
-                ClearTiles(matches);
-                CollapseColumns();
-                RefillEmptyTiles();
-                matches = _matchFinder.FindMatches(_grid);
+                ProcessMatchStep(groups, spawnCandidates);
+                spawnCandidates = NoCandidates;
+                groups = _matchFinder.FindMatches(_grid);
             }
 
             BoardSettled?.Invoke();
         }
 
-        private void SwapTiles(Vector2Int a, Vector2Int b)
+        private void ProcessMatchStep(IReadOnlyList<MatchGroup> groups, IReadOnlyList<Vector2Int> spawnCandidates)
         {
-            (_grid[a.x, a.y], _grid[b.x, b.y]) = (_grid[b.x, b.y], _grid[a.x, a.y]);
+            var spawns = new Dictionary<Vector2Int, Tile>();
+            foreach (MatchGroup group in groups)
+            {
+                if (!TryGetPowerSpawn(group, out PowerTileKind kind))
+                {
+                    continue;
+                }
+
+                Vector2Int cell = ChooseSpawnCell(group, spawnCandidates, spawns);
+                spawns[cell] = new Tile(group.Color, kind);
+            }
+
+            var cleared = new List<Vector2Int>();
+            var clearedSet = new HashSet<Vector2Int>();
+            foreach (MatchGroup group in groups)
+            {
+                foreach (Vector2Int cell in group.Cells)
+                {
+                    if (!spawns.ContainsKey(cell) && clearedSet.Add(cell))
+                    {
+                        cleared.Add(cell);
+                    }
+                }
+            }
+
+            if (cleared.Count > 0)
+            {
+                TilesMatched?.Invoke(cleared);
+            }
+
+            foreach (Vector2Int cell in cleared)
+            {
+                _grid[cell.x, cell.y] = Tile.Empty;
+            }
+
+            foreach (KeyValuePair<Vector2Int, Tile> spawn in spawns)
+            {
+                _grid[spawn.Key.x, spawn.Key.y] = spawn.Value;
+            }
+
+            CollapseColumns();
+            RefillEmptyTiles();
         }
 
-        private void ClearTiles(IReadOnlyList<Vector2Int> positions)
+        private static bool TryGetPowerSpawn(MatchGroup group, out PowerTileKind kind)
         {
-            foreach (var position in positions)
+            if (group.Shape == MatchShape.Square)
             {
-                _grid[position.x, position.y] = Tile.Empty;
+                kind = PowerTileKind.Mortar;
+                return true;
             }
+
+            if (group.Shape == MatchShape.Line && group.Cells.Count >= 4)
+            {
+                kind = group.IsHorizontal ? PowerTileKind.ClearColumn : PowerTileKind.ClearRow;
+                return true;
+            }
+
+            kind = PowerTileKind.None;
+            return false;
+        }
+
+        private static Vector2Int ChooseSpawnCell(MatchGroup group, IReadOnlyList<Vector2Int> candidates, Dictionary<Vector2Int, Tile> taken)
+        {
+            foreach (Vector2Int candidate in candidates)
+            {
+                if (Contains(group.Cells, candidate) && !taken.ContainsKey(candidate))
+                {
+                    return candidate;
+                }
+            }
+
+            Vector2Int middle = group.Cells[group.Cells.Count / 2];
+            if (!taken.ContainsKey(middle))
+            {
+                return middle;
+            }
+
+            foreach (Vector2Int cell in group.Cells)
+            {
+                if (!taken.ContainsKey(cell))
+                {
+                    return cell;
+                }
+            }
+
+            return middle;
+        }
+
+        private static bool Contains(IReadOnlyList<Vector2Int> cells, Vector2Int target)
+        {
+            for (int i = 0; i < cells.Count; i++)
+            {
+                if (cells[i] == target)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // --- Detonation (chain reactions) ---
+
+        private void ResolveDetonation(IReadOnlyList<Vector2Int> detonators)
+        {
+            var cleared = new List<Vector2Int>();
+            var clearedSet = new HashSet<Vector2Int>();
+            var toProcess = new Queue<Vector2Int>();
+            foreach (Vector2Int cell in detonators)
+            {
+                toProcess.Enqueue(cell);
+            }
+
+            while (toProcess.Count > 0)
+            {
+                Vector2Int cell = toProcess.Dequeue();
+                if (clearedSet.Contains(cell))
+                {
+                    continue;
+                }
+
+                Tile tile = _grid[cell.x, cell.y];
+                if (tile.IsEmpty)
+                {
+                    continue;
+                }
+
+                clearedSet.Add(cell);
+                cleared.Add(cell);
+
+                if (tile.IsPowerTile)
+                {
+                    foreach (Vector2Int patternCell in ComputePattern(cell, tile.Power))
+                    {
+                        if (!clearedSet.Contains(patternCell))
+                        {
+                            toProcess.Enqueue(patternCell);
+                        }
+                    }
+                }
+            }
+
+            if (cleared.Count > 0)
+            {
+                TilesMatched?.Invoke(cleared);
+            }
+
+            foreach (Vector2Int cell in cleared)
+            {
+                _grid[cell.x, cell.y] = Tile.Empty;
+            }
+
+            CollapseColumns();
+            RefillEmptyTiles();
+
+            RunMatchCascade(_matchFinder.FindMatches(_grid), NoCandidates);
+        }
+
+        private IEnumerable<Vector2Int> ComputePattern(Vector2Int origin, PowerTileKind kind)
+        {
+            switch (kind)
+            {
+                case PowerTileKind.ClearColumn:
+                    for (int y = 0; y < Height; y++)
+                    {
+                        yield return new Vector2Int(origin.x, y);
+                    }
+                    break;
+
+                case PowerTileKind.ClearRow:
+                    for (int x = 0; x < Width; x++)
+                    {
+                        yield return new Vector2Int(x, origin.y);
+                    }
+                    break;
+
+                case PowerTileKind.Mortar:
+                    if (TryPickMortarTarget(origin, out Vector2Int target))
+                    {
+                        yield return target;
+                    }
+                    break;
+            }
+        }
+
+        private bool TryPickMortarTarget(Vector2Int origin, out Vector2Int target)
+        {
+            // Objective tiles arrive in a later phase; for now, strike a random
+            // non-empty tile other than the mortar's own cell.
+            var candidates = new List<Vector2Int>();
+            for (int x = 0; x < Width; x++)
+            {
+                for (int y = 0; y < Height; y++)
+                {
+                    var cell = new Vector2Int(x, y);
+                    if (cell == origin || _grid[x, y].IsEmpty)
+                    {
+                        continue;
+                    }
+
+                    candidates.Add(cell);
+                }
+            }
+
+            if (candidates.Count == 0)
+            {
+                target = default;
+                return false;
+            }
+
+            target = candidates[_random.Next(candidates.Count)];
+            return true;
+        }
+
+        // --- Grid mechanics ---
+
+        private void SwapCells(Vector2Int a, Vector2Int b)
+        {
+            (_grid[a.x, a.y], _grid[b.x, b.y]) = (_grid[b.x, b.y], _grid[a.x, a.y]);
         }
 
         private void CollapseColumns()
@@ -162,26 +401,33 @@ namespace Game.Core
         private TileType RandomTypeAvoidingMatch(int x, int y)
         {
             TileType type;
+            int guard = 0;
             do
             {
                 type = RandomTileType();
+                guard++;
             }
-            while (CreatesImmediateMatch(x, y, type));
+            while (CreatesImmediateMatch(x, y, type) && guard < 50);
 
             return type;
         }
 
         private bool CreatesImmediateMatch(int x, int y, TileType type)
         {
-            bool horizontalMatch = x >= 2
+            bool horizontal = x >= 2
                 && _grid[x - 1, y].Type == type
                 && _grid[x - 2, y].Type == type;
 
-            bool verticalMatch = y >= 2
+            bool vertical = y >= 2
                 && _grid[x, y - 1].Type == type
                 && _grid[x, y - 2].Type == type;
 
-            return horizontalMatch || verticalMatch;
+            bool square = x >= 1 && y >= 1
+                && _grid[x - 1, y].Type == type
+                && _grid[x, y - 1].Type == type
+                && _grid[x - 1, y - 1].Type == type;
+
+            return horizontal || vertical || square;
         }
 
         private TileType RandomTileType()

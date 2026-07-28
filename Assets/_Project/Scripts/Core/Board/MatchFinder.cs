@@ -4,23 +4,30 @@ using UnityEngine;
 namespace Game.Core
 {
     /// <summary>
-    /// Default match rule: 3 or more same-type tiles in a row, horizontally or
-    /// vertically. Each responsibility (scan horizontal, scan vertical, decide
-    /// if a run counts, record a run) is its own small method.
+    /// Default match rules: straight runs of 3+ (horizontal and vertical) and
+    /// 2x2 squares of one color. Power tiles and empties are inert - they never
+    /// form or extend a run/square - so a power tile just sits until moved.
+    /// Each responsibility (scan a direction, record a run, find squares) is its
+    /// own small method.
     /// </summary>
     public class MatchFinder : IMatchFinder
     {
-        private const int MinimumMatchLength = 3;
+        private const int MinimumRunLength = 3;
 
-        public IReadOnlyList<Vector2Int> FindMatches(Tile[,] grid)
+        public IReadOnlyList<MatchGroup> FindMatches(Tile[,] grid)
         {
-            var matched = new HashSet<Vector2Int>();
-            FindHorizontalMatches(grid, matched);
-            FindVerticalMatches(grid, matched);
-            return new List<Vector2Int>(matched);
+            var groups = new List<MatchGroup>();
+            FindHorizontalRuns(grid, groups);
+            FindVerticalRuns(grid, groups);
+            FindSquares(grid, groups);
+            return groups;
         }
 
-        private void FindHorizontalMatches(Tile[,] grid, HashSet<Vector2Int> matched)
+        private static bool IsMatchable(Tile tile) => !tile.IsEmpty && !tile.IsPowerTile;
+
+        private static bool SameColor(Tile a, Tile b) => IsMatchable(a) && IsMatchable(b) && a.Type == b.Type;
+
+        private void FindHorizontalRuns(Tile[,] grid, List<MatchGroup> groups)
         {
             int width = grid.GetLength(0);
             int height = grid.GetLength(1);
@@ -30,19 +37,19 @@ namespace Game.Core
                 int runStart = 0;
                 for (int x = 1; x <= width; x++)
                 {
-                    bool runBroken = x == width || !SameType(grid, x, y, runStart, y);
+                    bool runBroken = x == width || !SameColor(grid[x, y], grid[runStart, y]);
                     if (!runBroken)
                     {
                         continue;
                     }
 
-                    RecordRunIfLongEnough(matched, runStart, y, x - runStart, horizontal: true);
+                    AddRunIfLongEnough(grid, groups, runStart, y, x - runStart, horizontal: true);
                     runStart = x;
                 }
             }
         }
 
-        private void FindVerticalMatches(Tile[,] grid, HashSet<Vector2Int> matched)
+        private void FindVerticalRuns(Tile[,] grid, List<MatchGroup> groups)
         {
             int width = grid.GetLength(0);
             int height = grid.GetLength(1);
@@ -52,37 +59,70 @@ namespace Game.Core
                 int runStart = 0;
                 for (int y = 1; y <= height; y++)
                 {
-                    bool runBroken = y == height || !SameType(grid, x, y, x, runStart);
+                    bool runBroken = y == height || !SameColor(grid[x, y], grid[x, runStart]);
                     if (!runBroken)
                     {
                         continue;
                     }
 
-                    RecordRunIfLongEnough(matched, x, runStart, y - runStart, horizontal: false);
+                    AddRunIfLongEnough(grid, groups, x, runStart, y - runStart, horizontal: false);
                     runStart = y;
                 }
             }
         }
 
-        private static bool SameType(Tile[,] grid, int ax, int ay, int bx, int by)
+        private static void AddRunIfLongEnough(Tile[,] grid, List<MatchGroup> groups, int startX, int startY, int length, bool horizontal)
         {
-            Tile a = grid[ax, ay];
-            Tile b = grid[bx, by];
-            return !a.IsEmpty && a.Type == b.Type;
-        }
-
-        private static void RecordRunIfLongEnough(HashSet<Vector2Int> matched, int startX, int startY, int length, bool horizontal)
-        {
-            if (length < MinimumMatchLength)
+            if (length < MinimumRunLength)
             {
                 return;
             }
 
+            var cells = new List<Vector2Int>(length);
             for (int i = 0; i < length; i++)
             {
                 int x = horizontal ? startX + i : startX;
                 int y = horizontal ? startY : startY + i;
-                matched.Add(new Vector2Int(x, y));
+                cells.Add(new Vector2Int(x, y));
+            }
+
+            TileType color = grid[cells[0].x, cells[0].y].Type;
+            groups.Add(new MatchGroup(cells, color, MatchShape.Line, horizontal));
+        }
+
+        private void FindSquares(Tile[,] grid, List<MatchGroup> groups)
+        {
+            int width = grid.GetLength(0);
+            int height = grid.GetLength(1);
+
+            for (int x = 0; x < width - 1; x++)
+            {
+                for (int y = 0; y < height - 1; y++)
+                {
+                    Tile anchor = grid[x, y];
+                    if (!IsMatchable(anchor))
+                    {
+                        continue;
+                    }
+
+                    bool isSquare = SameColor(anchor, grid[x + 1, y])
+                        && SameColor(anchor, grid[x, y + 1])
+                        && SameColor(anchor, grid[x + 1, y + 1]);
+
+                    if (!isSquare)
+                    {
+                        continue;
+                    }
+
+                    var cells = new List<Vector2Int>
+                    {
+                        new Vector2Int(x, y),
+                        new Vector2Int(x + 1, y),
+                        new Vector2Int(x, y + 1),
+                        new Vector2Int(x + 1, y + 1)
+                    };
+                    groups.Add(new MatchGroup(cells, anchor.Type, MatchShape.Square, isHorizontal: false));
+                }
             }
         }
     }
