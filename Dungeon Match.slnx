@@ -1,6 +1,6 @@
 ﻿<Solution>
+  <Project Path="Game.Gameplay.csproj" />
   <Project Path="Game.Core.csproj" />
   <Project Path="Game.Tests.csproj" />
-  <Project Path="Game.Gameplay.csproj" />
   <Project Path="Game.Presentation.csproj" />
 </Solution>

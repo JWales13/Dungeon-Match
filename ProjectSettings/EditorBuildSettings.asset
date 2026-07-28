@@ -6,7 +6,10 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 8c9cfa26abfee488c85f1582747f6a02
+    path: Assets/Scenes/GreenRoom.unity
+    guid: 092a94209829c4322b9c5b32559cfe9c
+  - enabled: 1
+    path: Assets/Scenes/Floor.unity
+    guid: c7ece56ae612e4d589977bd3743e7745
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
