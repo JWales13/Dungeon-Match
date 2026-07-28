@@ -110,6 +110,32 @@ namespace Game.Core
             return true;
         }
 
+        /// <summary>
+        /// Detonates a 3x3 area centered on a cell - a crafted "Dynamite" blast.
+        /// Clears the area and chains any power tiles caught in it. It does not
+        /// go through the swap path, so callers treat it as free help, not a
+        /// player move.
+        /// </summary>
+        public void UseAreaBlast(Vector2Int center)
+        {
+            ThrowIfOutOfBounds(center);
+
+            var cells = new List<Vector2Int>();
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    var cell = new Vector2Int(center.x + dx, center.y + dy);
+                    if (cell.x >= 0 && cell.x < Width && cell.y >= 0 && cell.y < Height)
+                    {
+                        cells.Add(cell);
+                    }
+                }
+            }
+
+            ResolveDetonation(cells);
+        }
+
         // --- Match resolution (may create power tiles) ---
 
         private void RunMatchCascade(IReadOnlyList<MatchGroup> groups, IReadOnlyList<Vector2Int> spawnCandidates)

@@ -4,13 +4,15 @@ using UnityEngine;
 namespace Game.Gameplay
 {
     /// <summary>
-    /// Turns raw pointer down/up events into "the player wants to swap these
-    /// two cells" requests. Knows nothing about Board or match rules - it only
-    /// knows screen-to-cell conversion (via BoardView) and drag direction.
+    /// Turns raw pointer down/up events into intents: a drag becomes a
+    /// SwapRequested; a tap (press and release on the same cell) becomes a
+    /// CellTapped (used to target a booster). Knows nothing about Board or
+    /// match rules - only screen-to-cell conversion and drag direction.
     /// </summary>
     public class InputController : MonoBehaviour
     {
         public event Action<Vector2Int, Vector2Int> SwapRequested;
+        public event Action<Vector2Int> CellTapped;
 
         [SerializeField] private BoardView _boardView;
 
@@ -73,6 +75,7 @@ namespace Game.Gameplay
 
             if (endCell == _dragStartCell)
             {
+                CellTapped?.Invoke(_dragStartCell);
                 return;
             }
 

@@ -4,13 +4,12 @@ using Game.Core;
 namespace Game.Tests
 {
     /// <summary>
-    /// Combat rules verified in isolation - no Board, no randomness, no Play
-    /// mode. Moves are built as MoveOutcomes of a single color; combat that
-    /// ignores color simply reads Total.
+    /// Combat rules in isolation. Damage (RegisterClears) and moves (SpendMove)
+    /// are now separate, so a booster can deal damage without costing a move.
     /// </summary>
     public class MonsterCombatObjectiveTests
     {
-        /// <summary>A move that cleared <paramref name="tiles"/> tiles (all one color).</summary>
+        /// <summary>A settle that cleared <paramref name="tiles"/> tiles (all one color).</summary>
         private static MoveOutcome Move(int tiles)
         {
             var builder = new MoveOutcomeBuilder();
@@ -23,50 +22,62 @@ namespace Game.Tests
         }
 
         [Test]
-        public void RegisterResolvedMove_DealsDamagePerTile()
+        public void RegisterClears_DealsDamage_WithoutSpendingMoves()
         {
             var objective = new MonsterCombatObjective(monsterHealth: 10, moveLimit: 5, damagePerTile: 2);
 
-            objective.RegisterResolvedMove(Move(3)); // 3 tiles * 2 = 6 damage
+            objective.RegisterClears(Move(3)); // 3 * 2 = 6 damage
 
             Assert.AreEqual(4, objective.CurrentHealth);
+            Assert.AreEqual(5, objective.MovesRemaining, "Clears must not consume a move.");
             Assert.AreEqual(ObjectiveStatus.InProgress, objective.Status);
         }
 
         [Test]
-        public void DepletingHealth_WinsTheEncounter()
+        public void ClearingToZeroHealth_Wins()
         {
             var objective = new MonsterCombatObjective(monsterHealth: 6, moveLimit: 5);
 
-            objective.RegisterResolvedMove(Move(6));
+            objective.RegisterClears(Move(6));
 
             Assert.AreEqual(0, objective.CurrentHealth);
             Assert.AreEqual(ObjectiveStatus.Won, objective.Status);
         }
 
         [Test]
-        public void RunningOutOfMoves_LosesTheEncounter()
+        public void SpendingAllMoves_WithMonsterAlive_Loses()
         {
-            var objective = new MonsterCombatObjective(monsterHealth: 100, moveLimit: 2, damagePerTile: 1);
+            var objective = new MonsterCombatObjective(monsterHealth: 100, moveLimit: 2);
 
-            objective.RegisterResolvedMove(Move(1));
+            objective.SpendMove();
             Assert.AreEqual(ObjectiveStatus.InProgress, objective.Status);
 
-            objective.RegisterResolvedMove(Move(1));
+            objective.SpendMove();
             Assert.AreEqual(ObjectiveStatus.Lost, objective.Status);
         }
 
         [Test]
-        public void MovesAfterResolution_AreIgnored()
+        public void LethalClearOnLastMove_Wins_NotLoses()
+        {
+            var objective = new MonsterCombatObjective(monsterHealth: 3, moveLimit: 1);
+
+            objective.RegisterClears(Move(3)); // kills it
+            objective.SpendMove();             // last move spent, but already won
+
+            Assert.AreEqual(ObjectiveStatus.Won, objective.Status);
+        }
+
+        [Test]
+        public void ActionsAfterResolution_AreIgnored()
         {
             var objective = new MonsterCombatObjective(monsterHealth: 3, moveLimit: 5);
 
-            objective.RegisterResolvedMove(Move(3)); // wins here
-            objective.RegisterResolvedMove(Move(3)); // must be a no-op
+            objective.RegisterClears(Move(3)); // wins
+            objective.RegisterClears(Move(3)); // no-op
+            objective.SpendMove();             // no-op
 
             Assert.AreEqual(ObjectiveStatus.Won, objective.Status);
-            Assert.AreEqual(1, objective.MovesUsed);
-            Assert.AreEqual(0, objective.CurrentHealth);
+            Assert.AreEqual(0, objective.MovesUsed);
         }
     }
 }

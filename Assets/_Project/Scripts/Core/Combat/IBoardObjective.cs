@@ -4,10 +4,12 @@ namespace Game.Core
 {
     /// <summary>
     /// A pluggable win/lose rule that sits above the Board. The Board doesn't
-    /// know objectives exist; a driver feeds resolved-move info into whichever
-    /// objective is active. This is the seam that lets us swap "drain monster
-    /// HP" for "hit a score target" or "collect N red tiles" without touching
-    /// board or rendering code.
+    /// know objectives exist; a driver feeds resolved-clear info in.
+    ///
+    /// Note: this reports tiles CLEARED (for damage/score). Consuming a "move"
+    /// is a separate, objective-specific concern (see MonsterCombatObjective's
+    /// SpendMove) - because clears can come from things that aren't a player
+    /// move, like a crafted booster.
     /// </summary>
     public interface IBoardObjective
     {
@@ -16,9 +18,8 @@ namespace Game.Core
         event Action<ObjectiveStatus> StatusChanged;
 
         /// <summary>
-        /// Called once per fully-resolved player move (after all cascades
-        /// settle), with a breakdown of what was cleared during that move.
+        /// Called once per fully-resolved board settle, with what was cleared.
         /// </summary>
-        void RegisterResolvedMove(MoveOutcome move);
+        void RegisterClears(MoveOutcome move);
     }
 }

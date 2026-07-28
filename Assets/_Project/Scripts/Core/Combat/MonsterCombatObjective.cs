@@ -5,12 +5,14 @@ namespace Game.Core
 {
     /// <summary>
     /// The combat rule: drain a monster's HP by clearing tiles within a move
-    /// limit. Win at 0 HP; lose when moves run out first. Pure C# and unit
-    /// tested directly (MonsterCombatObjectiveTests).
+    /// limit. Win at 0 HP; lose when moves run out first.
     ///
-    /// Note: relic/booster damage modifiers were removed in the Phase 0 cleanup
-    /// (DungeonVision pivot). Crafted-booster effects will re-enter combat in a
-    /// later phase via the new station/booster system, not the old RelicSet.
+    /// Damage and moves are decoupled on purpose: RegisterClears applies damage
+    /// from any board settle (a swap match, a power-tile detonation, OR a
+    /// crafted booster), while SpendMove is called only for a real player move
+    /// (a swap). So a booster deals damage without costing a move.
+    ///
+    /// Pure C# and unit tested directly (MonsterCombatObjectiveTests).
     /// </summary>
     public class MonsterCombatObjective : IBoardObjective
     {
@@ -39,7 +41,8 @@ namespace Game.Core
             MoveLimit = moveLimit;
         }
 
-        public void RegisterResolvedMove(MoveOutcome move)
+        /// <summary>Applies damage from cleared tiles. Does NOT consume a move.</summary>
+        public void RegisterClears(MoveOutcome move)
         {
             if (Status != ObjectiveStatus.InProgress)
             {
@@ -47,32 +50,34 @@ namespace Game.Core
             }
 
             ApplyDamage(move.Total * _damagePerTile);
-            ConsumeMove();
-            EvaluateOutcome();
+
+            if (CurrentHealth <= 0)
+            {
+                SetStatus(ObjectiveStatus.Won);
+            }
+        }
+
+        /// <summary>Consumes one move (a player swap). Lose if none remain and the monster lives.</summary>
+        public void SpendMove()
+        {
+            if (Status != ObjectiveStatus.InProgress)
+            {
+                return;
+            }
+
+            MovesUsed++;
+            MovesChanged?.Invoke(MovesRemaining, MoveLimit);
+
+            if (MovesRemaining <= 0 && CurrentHealth > 0)
+            {
+                SetStatus(ObjectiveStatus.Lost);
+            }
         }
 
         private void ApplyDamage(int amount)
         {
             CurrentHealth = Mathf.Max(0, CurrentHealth - amount);
             HealthChanged?.Invoke(CurrentHealth, MaxHealth);
-        }
-
-        private void ConsumeMove()
-        {
-            MovesUsed++;
-            MovesChanged?.Invoke(MovesRemaining, MoveLimit);
-        }
-
-        private void EvaluateOutcome()
-        {
-            if (CurrentHealth <= 0)
-            {
-                SetStatus(ObjectiveStatus.Won);
-            }
-            else if (MovesRemaining <= 0)
-            {
-                SetStatus(ObjectiveStatus.Lost);
-            }
         }
 
         private void SetStatus(ObjectiveStatus status)

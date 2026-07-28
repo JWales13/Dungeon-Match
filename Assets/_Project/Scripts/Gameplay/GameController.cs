@@ -5,13 +5,14 @@ using Game.Core;
 namespace Game.Gameplay
 {
     /// <summary>
-    /// Single-floor player plus the (temporary in-combat) Bomb Bench. Loads the
-    /// ingredient and booster stashes once, ticks the station each frame,
-    /// harvests ingredients from detonations, and saves both stashes at floor
-    /// end (win or lose). Boosters auto-deposit as they finish.
+    /// Single-floor player plus the (temporary in-combat) Bomb Bench and the
+    /// booster loadout. Loads the ingredient and booster stashes once, ticks the
+    /// station each frame, harvests ingredients from detonations, and saves both
+    /// stashes at floor end. Boosters auto-deposit as they finish; the player
+    /// can bring one Dynamite into a floor and tap a tile to set it off.
     ///
-    /// The station lives on the combat screen only because there's no Green Room
-    /// yet (Phase 5); it will move to the hub then.
+    /// The station/loadout live on the combat screen only because there's no
+    /// Green Room yet (Phase 5).
     /// </summary>
     public class GameController : MonoBehaviour
     {
@@ -25,6 +26,7 @@ namespace Game.Gameplay
 
         [SerializeField] private IngredientHudView _ingredientHudView;
         [SerializeField] private StationView _stationView;
+        [SerializeField] private BoosterLoadoutView _loadoutView;
 
         [Header("Board size")]
         [SerializeField] private int _boardWidth = 8;
@@ -53,10 +55,15 @@ namespace Game.Gameplay
         private IngredientHarvester _harvester;
         private bool _acceptingInput;
 
+        private bool _dynamiteArmed;
+        private bool _dynamiteUsedThisFloor;
+
         private void Awake()
         {
             _inputController.SwapRequested += HandleSwapRequested;
+            _inputController.CellTapped += HandleCellTapped;
             _floorResultView.PlayAgainPressed += HandlePlayAgain;
+            _loadoutView.UseDynamitePressed += HandleUseDynamitePressed;
         }
 
         private void Start()
@@ -65,6 +72,7 @@ namespace Game.Gameplay
             _inventory = _ingredientRepository.Load();
             _boosterRepository = new BoosterInventoryRepository();
             _boosters = _boosterRepository.Load();
+            _boosters.Changed += RefreshLoadout;
 
             _bombBench = new ProducerStation(
                 BoosterType.Dynamite, TileType.Red,
@@ -103,11 +111,22 @@ namespace Game.Gameplay
             if (_inputController != null)
             {
                 _inputController.SwapRequested -= HandleSwapRequested;
+                _inputController.CellTapped -= HandleCellTapped;
             }
 
             if (_floorResultView != null)
             {
                 _floorResultView.PlayAgainPressed -= HandlePlayAgain;
+            }
+
+            if (_loadoutView != null)
+            {
+                _loadoutView.UseDynamitePressed -= HandleUseDynamitePressed;
+            }
+
+            if (_boosters != null)
+            {
+                _boosters.Changed -= RefreshLoadout;
             }
 
             UnsubscribeObjective();
@@ -127,7 +146,10 @@ namespace Game.Gameplay
             _combatHudView.Initialize(_objective);
             _floorResultView.HideResult();
 
+            _dynamiteArmed = false;
+            _dynamiteUsedThisFloor = false;
             _acceptingInput = true;
+            RefreshLoadout();
         }
 
         private void HandleObjectiveStatusChanged(ObjectiveStatus status)
@@ -138,14 +160,10 @@ namespace Game.Gameplay
             }
 
             _acceptingInput = false;
+            _dynamiteArmed = false;
             SaveStashes();
+            RefreshLoadout();
             _floorResultView.ShowResult(won: status == ObjectiveStatus.Won);
-        }
-
-        private void HandlePlayAgain()
-        {
-            _floorResultView.HideResult();
-            LoadFloor();
         }
 
         private void HandleSwapRequested(Vector2Int a, Vector2Int b)
@@ -155,7 +173,55 @@ namespace Game.Gameplay
                 return;
             }
 
-            _board.TrySwap(a, b);
+            // A swap that "takes" (forms a match, or moves a power tile) is one
+            // move. Damage from the resulting clears is applied by the driver.
+            if (_board.TrySwap(a, b))
+            {
+                _objective.SpendMove();
+            }
+        }
+
+        private void HandleUseDynamitePressed()
+        {
+            if (!CanUseDynamite())
+            {
+                return;
+            }
+
+            _dynamiteArmed = true;
+            RefreshLoadout();
+        }
+
+        private void HandleCellTapped(Vector2Int cell)
+        {
+            if (!_dynamiteArmed || !_acceptingInput)
+            {
+                return;
+            }
+
+            _board.UseAreaBlast(cell); // deals damage via the driver; costs no move
+            _boosters.TrySpend(BoosterType.Dynamite, 1);
+            _boosterRepository.Save(_boosters);
+
+            _dynamiteArmed = false;
+            _dynamiteUsedThisFloor = true;
+            RefreshLoadout();
+        }
+
+        private bool CanUseDynamite()
+        {
+            return _acceptingInput && !_dynamiteUsedThisFloor && _boosters.GetCount(BoosterType.Dynamite) > 0;
+        }
+
+        private void RefreshLoadout()
+        {
+            _loadoutView.SetDynamite(_boosters.GetCount(BoosterType.Dynamite), CanUseDynamite(), _dynamiteArmed);
+        }
+
+        private void HandlePlayAgain()
+        {
+            _floorResultView.HideResult();
+            LoadFloor();
         }
 
         private void SaveStashes()

@@ -36,7 +36,7 @@ namespace Game.Core
 
         private void HandleBoardSettled()
         {
-            _objective.RegisterResolvedMove(_builder.Build());
+            _objective.RegisterClears(_builder.Build());
             _builder.Reset();
         }
     }
