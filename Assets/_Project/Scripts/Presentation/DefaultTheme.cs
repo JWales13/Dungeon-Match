@@ -45,6 +45,16 @@ namespace Game.Presentation
             }
         }
 
+        // Boosters (one per Producer station)
+        public string GetBoosterName(BoosterType type)
+        {
+            switch (type)
+            {
+                case BoosterType.Dynamite: return "Dynamite";
+                default:                   return "?";
+            }
+        }
+
         // Power tiles
         public float PowerTileHighlightAmount => 0.45f;
         public float PowerTileThickness => 0.4f;

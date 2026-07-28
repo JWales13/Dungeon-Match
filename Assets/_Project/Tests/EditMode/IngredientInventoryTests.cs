@@ -54,5 +54,18 @@ namespace Game.Tests
 
             Assert.AreEqual(4, inventory.GetCount(TileType.Yellow));
         }
+
+        [Test]
+        public void TrySpend_DeductsWhenEnough_ElseUnchanged()
+        {
+            var inventory = new IngredientInventory();
+            inventory.Add(TileType.Red, 5);
+
+            Assert.IsTrue(inventory.TrySpend(TileType.Red, 3));
+            Assert.AreEqual(2, inventory.GetCount(TileType.Red));
+
+            Assert.IsFalse(inventory.TrySpend(TileType.Red, 5));
+            Assert.AreEqual(2, inventory.GetCount(TileType.Red));
+        }
     }
 }

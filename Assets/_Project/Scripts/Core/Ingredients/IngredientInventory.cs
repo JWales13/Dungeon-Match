@@ -48,5 +48,18 @@ namespace Game.Core
             _counts[color] = GetCount(color) + amount;
             Changed?.Invoke();
         }
+
+        /// <summary>Spends ingredients if enough are available; returns false (and changes nothing) otherwise.</summary>
+        public bool TrySpend(TileType color, int amount)
+        {
+            if (amount <= 0 || GetCount(color) < amount)
+            {
+                return false;
+            }
+
+            _counts[color] = GetCount(color) - amount;
+            Changed?.Invoke();
+            return true;
+        }
     }
 }

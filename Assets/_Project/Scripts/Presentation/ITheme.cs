@@ -25,6 +25,10 @@ namespace Game.Presentation
         // The display name for a color's crafting ingredient.
         string GetIngredientName(TileType color);
 
+        // --- Boosters ---
+        // The display name for a crafted booster.
+        string GetBoosterName(BoosterType type);
+
         // --- Power tiles ---
         // How far a power tile's color is blended toward MatchedFlashColor (0-1).
         float PowerTileHighlightAmount { get; }

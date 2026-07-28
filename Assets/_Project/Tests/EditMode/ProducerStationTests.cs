@@ -1,0 +1,90 @@
+using NUnit.Framework;
+using Game.Core;
+
+namespace Game.Tests
+{
+    /// <summary>
+    /// Producer-station rules: ingredient + time gating, buffer cap, and
+    /// collect. Time is fed in via Tick so every case is deterministic.
+    /// </summary>
+    public class ProducerStationTests
+    {
+        private static ProducerStation Bench(IngredientInventory ingredients, int cost = 2, float seconds = 5f, int capacity = 3)
+        {
+            return new ProducerStation(BoosterType.Dynamite, TileType.Red, cost, seconds, capacity, ingredients);
+        }
+
+        [Test]
+        public void StartsProducing_AndSpendsIngredientsUpFront()
+        {
+            var ingredients = new IngredientInventory();
+            ingredients.Add(TileType.Red, 10);
+            var station = Bench(ingredients, cost: 2, seconds: 5f);
+
+            station.Tick(2f); // starts + 2s of progress, not done yet
+
+            Assert.IsTrue(station.IsProducing);
+            Assert.AreEqual(0, station.BufferCount);
+            Assert.AreEqual(8, ingredients.GetCount(TileType.Red)); // spent 2 on start
+        }
+
+        [Test]
+        public void CompletesAUnit_AfterEnoughTime()
+        {
+            var ingredients = new IngredientInventory();
+            ingredients.Add(TileType.Red, 10);
+            var station = Bench(ingredients, cost: 2, seconds: 5f);
+
+            station.Tick(2f);
+            station.Tick(4f); // total 6s >= 5s -> one unit
+
+            Assert.AreEqual(1, station.BufferCount);
+            Assert.IsFalse(station.IsProducing);
+        }
+
+        [Test]
+        public void WithoutIngredients_NeverProduces()
+        {
+            var ingredients = new IngredientInventory(); // empty
+            var station = Bench(ingredients, cost: 2, seconds: 5f);
+
+            station.Tick(100f);
+
+            Assert.AreEqual(0, station.BufferCount);
+            Assert.IsFalse(station.IsProducing);
+        }
+
+        [Test]
+        public void StopsAtBufferCapacity_AndSpendsNoMoreIngredients()
+        {
+            var ingredients = new IngredientInventory();
+            ingredients.Add(TileType.Red, 100);
+            var station = Bench(ingredients, cost: 1, seconds: 1f, capacity: 2);
+
+            station.Tick(1f); // unit 1
+            station.Tick(1f); // unit 2 (buffer full)
+            int spentAfterFull = ingredients.GetCount(TileType.Red);
+            station.Tick(1f); // should do nothing - buffer full
+
+            Assert.AreEqual(2, station.BufferCount);
+            Assert.IsTrue(station.IsBufferFull);
+            Assert.AreEqual(spentAfterFull, ingredients.GetCount(TileType.Red)); // no extra spend
+        }
+
+        [Test]
+        public void Collect_EmptiesBuffer_AndReturnsCount()
+        {
+            var ingredients = new IngredientInventory();
+            ingredients.Add(TileType.Red, 100);
+            var station = Bench(ingredients, cost: 1, seconds: 1f, capacity: 2);
+
+            station.Tick(1f);
+            station.Tick(1f); // buffer = 2
+
+            int collected = station.Collect();
+
+            Assert.AreEqual(2, collected);
+            Assert.AreEqual(0, station.BufferCount);
+        }
+    }
+}
