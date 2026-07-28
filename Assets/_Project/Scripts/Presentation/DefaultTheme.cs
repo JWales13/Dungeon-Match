@@ -32,6 +32,19 @@ namespace Game.Presentation
 
         public Color MatchedFlashColor => Color.white;
 
+        // Ingredients (one per color)
+        public string GetIngredientName(TileType color)
+        {
+            switch (color)
+            {
+                case TileType.Red:    return "Gunpowder";
+                case TileType.Green:  return "Toxic Goo";
+                case TileType.Yellow: return "Live Wire";
+                case TileType.Blue:   return "Rations";
+                default:              return "?";
+            }
+        }
+
         // Power tiles
         public float PowerTileHighlightAmount => 0.45f;
         public float PowerTileThickness => 0.4f;

@@ -21,6 +21,10 @@ namespace Game.Presentation
         Color GetTileColor(TileType type);
         Color MatchedFlashColor { get; }
 
+        // --- Ingredients ---
+        // The display name for a color's crafting ingredient.
+        string GetIngredientName(TileType color);
+
         // --- Power tiles ---
         // How far a power tile's color is blended toward MatchedFlashColor (0-1).
         float PowerTileHighlightAmount { get; }

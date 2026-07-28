@@ -4,11 +4,11 @@ using Game.Core;
 namespace Game.Gameplay
 {
     /// <summary>
-    /// Minimal single-floor player (Phase 0 clean base for the DungeonVision
-    /// pivot). Builds one combat board, wires input and the HUD, and shows a
-    /// win/lose result with a button to try a fresh floor. No runs, relics, or
-    /// meta flow - those retired systems are being replaced by the new
-    /// board/booster/station design.
+    /// Single-floor player. Builds one combat board, wires input, the combat
+    /// HUD, and ingredient harvesting, and shows a win/lose result with a button
+    /// to try a fresh floor. The ingredient stash is loaded once and saved at
+    /// the end of each floor (win or lose), so harvested ingredients always
+    /// bank.
     /// </summary>
     public class GameController : MonoBehaviour
     {
@@ -17,6 +17,7 @@ namespace Game.Gameplay
         [SerializeField] private InputController _inputController;
         [SerializeField] private CombatHudView _combatHudView;
         [SerializeField] private RunFlowView _runFlowView;
+        [SerializeField] private IngredientHudView _ingredientHudView;
 
         [Header("Board size")]
         [SerializeField] private int _boardWidth = 8;
@@ -26,10 +27,15 @@ namespace Game.Gameplay
         [SerializeField] private int _monsterHealth = 30;
         [SerializeField] private int _moveLimit = 15;
         [SerializeField] private int _damagePerTile = 1;
+        [SerializeField] private int _ingredientsPerDetonation = 2;
+
+        private IngredientInventoryRepository _inventoryRepository;
+        private IngredientInventory _inventory;
 
         private Board _board;
         private MonsterCombatObjective _objective;
         private BoardObjectiveDriver _objectiveDriver;
+        private IngredientHarvester _harvester;
         private bool _acceptingInput;
 
         private void Awake()
@@ -40,6 +46,10 @@ namespace Game.Gameplay
 
         private void Start()
         {
+            _inventoryRepository = new IngredientInventoryRepository();
+            _inventory = _inventoryRepository.Load();
+            _ingredientHudView.Initialize(_inventory);
+
             LoadFloor();
         }
 
@@ -65,6 +75,7 @@ namespace Game.Gameplay
             _board = new Board(_boardWidth, _boardHeight, new MatchFinder());
             _objective = new MonsterCombatObjective(_monsterHealth, _moveLimit, _damagePerTile);
             _objectiveDriver = new BoardObjectiveDriver(_board, _objective);
+            _harvester = new IngredientHarvester(_board, _inventory, _ingredientsPerDetonation);
             _objective.StatusChanged += HandleObjectiveStatusChanged;
 
             _boardView.Initialize(_board);
@@ -82,6 +93,7 @@ namespace Game.Gameplay
             }
 
             _acceptingInput = false;
+            _inventoryRepository.Save(_inventory); // bank harvested ingredients, win or lose
             _runFlowView.ShowRunResult(won: status == ObjectiveStatus.Won);
         }
 

@@ -28,6 +28,9 @@ namespace Game.Core
         public event Action<IReadOnlyList<Vector2Int>> TilesMatched;
         public event Action BoardSettled;
 
+        /// <summary>Raised for each power tile that detonates, with its color (the ingredient it yields).</summary>
+        public event Action<TileType> PowerTileDetonated;
+
         private static readonly IReadOnlyList<Vector2Int> NoCandidates = new List<Vector2Int>();
 
         private readonly Tile[,] _grid;
@@ -260,6 +263,8 @@ namespace Game.Core
 
                 if (tile.IsPowerTile)
                 {
+                    PowerTileDetonated?.Invoke(tile.Type);
+
                     foreach (Vector2Int patternCell in ComputePattern(cell, tile.Power))
                     {
                         if (!clearedSet.Contains(patternCell))
