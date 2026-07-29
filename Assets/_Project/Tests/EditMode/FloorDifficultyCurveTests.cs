@@ -12,7 +12,7 @@ namespace Game.Tests
             return new FloorDifficultyCurve(
                 baseMonsterHealth: 30, monsterHealthPerDepth: 6,
                 baseMoveLimit: 15, moveLimitPerDepth: 1, maxMoveLimit: 18,
-                baseBoardSize: 8, boardSizePerDepth: 1, maxBoardSize: 10,
+                baseBoardSize: 8, boardSizePerDepth: 1, maxBoardSize: 20,
                 baseGoldReward: 25, goldRewardPerDepth: 5);
         }
 
@@ -45,7 +45,7 @@ namespace Game.Tests
             FloorSpec spec = Curve().Generate(50); // way past both caps
 
             Assert.AreEqual(18, spec.MoveLimit); // capped
-            Assert.AreEqual(10, spec.BoardSize);  // capped
+            Assert.AreEqual(20, spec.BoardSize);  // capped
             Assert.AreEqual(30 + 6 * 49, spec.MonsterHealth); // uncapped
             Assert.AreEqual(25 + 5 * 49, spec.GoldReward);    // uncapped
         }

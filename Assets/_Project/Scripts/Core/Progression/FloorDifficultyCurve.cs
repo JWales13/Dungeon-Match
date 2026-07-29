@@ -62,7 +62,10 @@ namespace Game.Core
             int boardSize = Math.Min(_maxBoardSize, _baseBoardSize + _boardSizePerDepth * depthIndex);
             int goldReward = _baseGoldReward + _goldRewardPerDepth * depthIndex;
 
-            return new FloorSpec(depth, boardSize, monsterHealth, moveLimit, goldReward);
+            // This curve doesn't know about tiers - callers that care about
+            // Main Event / Sweeps Week use TieredFloorGenerator, which wraps
+            // this and layers Tier/IngredientMultiplier on top.
+            return new FloorSpec(depth, boardSize, monsterHealth, moveLimit, goldReward, FloorTier.Regular, 1);
         }
     }
 }

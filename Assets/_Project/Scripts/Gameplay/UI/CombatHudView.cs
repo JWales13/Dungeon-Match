@@ -37,12 +37,25 @@ namespace Game.Gameplay
             ClearResult();
         }
 
-        /// <summary>Set once per floor load - depth doesn't change mid-floor, so this isn't event-driven.</summary>
-        public void SetDepth(int depth)
+        /// <summary>Set once per floor load - depth/tier don't change mid-floor, so this isn't event-driven.</summary>
+        public void SetDepth(int depth, FloorTier tier)
         {
-            if (_depthText != null)
+            if (_depthText == null)
             {
-                _depthText.text = $"Floor {depth}";
+                return;
+            }
+
+            switch (tier)
+            {
+                case FloorTier.MainEvent:
+                    _depthText.text = $"Floor {depth} — MAIN EVENT";
+                    break;
+                case FloorTier.SweepsWeek:
+                    _depthText.text = $"Floor {depth} — SWEEPS WEEK";
+                    break;
+                default:
+                    _depthText.text = $"Floor {depth}";
+                    break;
             }
         }
 

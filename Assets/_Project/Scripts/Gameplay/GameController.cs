@@ -9,13 +9,14 @@ namespace Game.Gameplay
 {
     /// <summary>
     /// The Floor scene's controller: plays one combat floor. Loads the
-    /// stashes, wallet, and tower depth; asks FloorDifficultyCurve for that
-    /// depth's FloorSpec (board size, monster HP, move limit, Gold reward);
-    /// runs the board and the in-floor Dynamite; tallies ingredients
-    /// harvested; and on a win pays out Gold + a Prize Voucher and advances
-    /// depth one floor deeper. On floor end it saves and shows the result;
-    /// Exit returns to the Green Room. Crafting (the Bomb Bench et al.) lives
-    /// in the Green Room.
+    /// stashes, wallet, and tower depth; asks TieredFloorGenerator for that
+    /// depth's FloorSpec (board size, monster HP, move limit, Gold reward,
+    /// tier, ingredient multiplier - Main Event/Sweeps Week floors hit
+    /// harder and pay/harvest more); runs the board and the in-floor
+    /// Dynamite; tallies ingredients harvested; and on a win pays out Gold +
+    /// a Prize Voucher and advances depth one floor deeper. On floor end it
+    /// saves and shows the result; Exit returns to the Green Room. Crafting
+    /// (the Bomb Bench et al.) lives in the Green Room.
     /// </summary>
     public class GameController : MonoBehaviour
     {
@@ -45,6 +46,18 @@ namespace Game.Gameplay
         [SerializeField] private int _baseGoldReward = 25;
         [SerializeField] private int _goldRewardPerDepth = 5;
 
+        [Header("Difficulty tiers")]
+        [Tooltip("Every Nth floor is a Main Event.")]
+        [SerializeField] private int _mainEventInterval = 5;
+        [Tooltip("Every Nth floor is a Sweeps Week (wins over Main Event if both apply).")]
+        [SerializeField] private int _sweepsWeekInterval = 10;
+        [SerializeField] private float _mainEventHealthMultiplier = 1.5f;
+        [SerializeField] private float _mainEventGoldMultiplier = 1.5f;
+        [SerializeField] private int _mainEventIngredientMultiplier = 2;
+        [SerializeField] private float _sweepsWeekHealthMultiplier = 2f;
+        [SerializeField] private float _sweepsWeekGoldMultiplier = 2.5f;
+        [SerializeField] private int _sweepsWeekIngredientMultiplier = 3;
+
         [Header("Floor tuning")]
         [SerializeField] private int _damagePerTile = 1;
         [SerializeField] private int _ingredientsPerDetonation = 2;
@@ -65,7 +78,7 @@ namespace Game.Gameplay
         private Wallet _wallet;
         private TowerProgressRepository _towerProgressRepository;
         private TowerProgress _towerProgress;
-        private FloorDifficultyCurve _difficultyCurve;
+        private TieredFloorGenerator _floorGenerator;
         private FloorSpec _currentFloorSpec;
 
         private Board _board;
@@ -101,11 +114,16 @@ namespace Game.Gameplay
             _towerProgressRepository = new TowerProgressRepository();
             _towerProgress = _towerProgressRepository.Load();
 
-            _difficultyCurve = new FloorDifficultyCurve(
+            var difficultyCurve = new FloorDifficultyCurve(
                 _baseMonsterHealth, _monsterHealthPerDepth,
                 _baseMoveLimit, _moveLimitPerDepth, _maxMoveLimit,
                 _baseBoardSize, _boardSizePerDepth, _maxBoardSize,
                 _baseGoldReward, _goldRewardPerDepth);
+            var tierSchedule = new FloorTierSchedule(_mainEventInterval, _sweepsWeekInterval);
+            _floorGenerator = new TieredFloorGenerator(
+                difficultyCurve, tierSchedule,
+                new TierMultipliers(_mainEventHealthMultiplier, _mainEventGoldMultiplier, _mainEventIngredientMultiplier),
+                new TierMultipliers(_sweepsWeekHealthMultiplier, _sweepsWeekGoldMultiplier, _sweepsWeekIngredientMultiplier));
 
             _ingredientHudView.Initialize(_inventory);
 
@@ -144,12 +162,13 @@ namespace Game.Gameplay
         {
             UnsubscribeObjective();
 
-            _currentFloorSpec = _difficultyCurve.Generate(_towerProgress.CurrentDepth);
+            _currentFloorSpec = _floorGenerator.Generate(_towerProgress.CurrentDepth);
+            int ingredientYield = _ingredientsPerDetonation * _currentFloorSpec.IngredientMultiplier;
 
             _board = new Board(_currentFloorSpec.BoardSize, _currentFloorSpec.BoardSize, new MatchFinder());
             _objective = new MonsterCombatObjective(_currentFloorSpec.MonsterHealth, _currentFloorSpec.MoveLimit, _damagePerTile);
             _objectiveDriver = new BoardObjectiveDriver(_board, _objective);
-            _harvester = new IngredientHarvester(_board, _inventory, _ingredientsPerDetonation);
+            _harvester = new IngredientHarvester(_board, _inventory, ingredientYield);
             _objective.StatusChanged += HandleObjectiveStatusChanged;
             _board.PowerTileDetonated += HandleHarvestTally;
 
@@ -157,7 +176,7 @@ namespace Game.Gameplay
 
             _boardView.Initialize(_board);
             _combatHudView.Initialize(_objective);
-            _combatHudView.SetDepth(_currentFloorSpec.Depth);
+            _combatHudView.SetDepth(_currentFloorSpec.Depth, _currentFloorSpec.Tier);
             _floorResultView.HideResult();
 
             _continuesUsedThisFloor = 0;
@@ -169,8 +188,9 @@ namespace Game.Gameplay
 
         private void HandleHarvestTally(TileType color)
         {
+            int yield = _ingredientsPerDetonation * _currentFloorSpec.IngredientMultiplier;
             _floorHarvest.TryGetValue(color, out int current);
-            _floorHarvest[color] = current + _ingredientsPerDetonation;
+            _floorHarvest[color] = current + yield;
         }
 
         private void HandleObjectiveStatusChanged(ObjectiveStatus status)
