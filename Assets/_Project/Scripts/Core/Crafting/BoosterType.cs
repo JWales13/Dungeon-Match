@@ -2,11 +2,13 @@ namespace Game.Core
 {
     /// <summary>
     /// The craftable boosters a player can carry into a floor. One per Producer
-    /// station. More arrive as we add stations (Acid Vial, Overcharge, Energy
-    /// Drink).
+    /// station (Bomb Bench, Goo Lab, Wire Rig, Mess Kit).
     /// </summary>
     public enum BoosterType
     {
-        Dynamite
+        Dynamite,
+        AcidVial,
+        Overcharge,
+        EnergyDrink
     }
 }

@@ -50,8 +50,11 @@ namespace Game.Presentation
         {
             switch (type)
             {
-                case BoosterType.Dynamite: return "Dynamite";
-                default:                   return "?";
+                case BoosterType.Dynamite:   return "Dynamite";
+                case BoosterType.AcidVial:   return "Acid Vial";
+                case BoosterType.Overcharge: return "Overcharge";
+                case BoosterType.EnergyDrink: return "Energy Drink";
+                default:                     return "?";
             }
         }
 

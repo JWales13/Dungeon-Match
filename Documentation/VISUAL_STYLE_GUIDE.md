@@ -89,9 +89,9 @@ Player-facing names, centralized in the theme (`GetIngredientName`,
 | Color  | Ingredient | Booster it crafts |
 |--------|------------|-------------------|
 | Red    | Gunpowder  | Dynamite          |
-| Green  | Toxic Goo  | Acid Vial *(later)* |
-| Yellow | Live Wire  | Overcharge *(later)* |
-| Blue   | Rations    | Energy Drink *(later)* |
+| Green  | Toxic Goo  | Acid Vial         |
+| Yellow | Live Wire  | Overcharge        |
+| Blue   | Rations    | Energy Drink      |
 
 ## Result strings
 

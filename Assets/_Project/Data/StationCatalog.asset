@@ -1,0 +1,83 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c46e2dd68c24e4f6480afe92039def16, type: 3}
+  m_Name: StationCatalog
+  m_EditorClassIdentifier: Game.Gameplay::Game.Gameplay.StationCatalogAsset
+  stations:
+  - displayName: Bomb Bench
+    output: 0
+    ingredientColor: 0
+    startsBuilt: 1
+    levels:
+    - ingredientCost: 3
+      productionSeconds: 10
+      bufferCapacity: 2
+      prizeVoucherCost: 10
+    - ingredientCost: 3
+      productionSeconds: 8
+      bufferCapacity: 3
+      prizeVoucherCost: 30
+    - ingredientCost: 2
+      productionSeconds: 6
+      bufferCapacity: 4
+      prizeVoucherCost: 60
+  - displayName: Goo Lab
+    output: 1
+    ingredientColor: 2
+    startsBuilt: 0
+    levels:
+    - ingredientCost: 3
+      productionSeconds: 12
+      bufferCapacity: 2
+      prizeVoucherCost: 15
+    - ingredientCost: 3
+      productionSeconds: 9
+      bufferCapacity: 3
+      prizeVoucherCost: 35
+    - ingredientCost: 2
+      productionSeconds: 7
+      bufferCapacity: 4
+      prizeVoucherCost: 65
+  - displayName: Wire Rig
+    output: 2
+    ingredientColor: 3
+    startsBuilt: 0
+    levels:
+    - ingredientCost: 3
+      productionSeconds: 14
+      bufferCapacity: 2
+      prizeVoucherCost: 20
+    - ingredientCost: 3
+      productionSeconds: 10
+      bufferCapacity: 3
+      prizeVoucherCost: 40
+    - ingredientCost: 2
+      productionSeconds: 8
+      bufferCapacity: 4
+      prizeVoucherCost: 70
+  - displayName: Mess Kit
+    output: 3
+    ingredientColor: 1
+    startsBuilt: 0
+    levels:
+    - ingredientCost: 3
+      productionSeconds: 16
+      bufferCapacity: 2
+      prizeVoucherCost: 25
+    - ingredientCost: 3
+      productionSeconds: 12
+      bufferCapacity: 3
+      prizeVoucherCost: 45
+    - ingredientCost: 2
+      productionSeconds: 9
+      bufferCapacity: 4
+      prizeVoucherCost: 75

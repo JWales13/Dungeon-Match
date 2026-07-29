@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
@@ -7,9 +9,11 @@ namespace Game.Gameplay
 {
     /// <summary>
     /// The Green Room (hub) scene's controller. Owns the crafting side of the
-    /// game: it loads the stashes and wallet, runs the Bomb Bench (which brews
-    /// Dynamite from Gunpowder over time and auto-deposits it), and shows the
-    /// player's stocks and currencies. The Play button saves and loads a floor.
+    /// game: for every station in the Station Catalog it loads (or defaults)
+    /// a build/upgrade StationProgress, runs the ones that are built (ticking
+    /// production, auto-collecting into the booster stash), and wires each to
+    /// its StationPanelView so Build/Upgrade button presses spend Prize
+    /// Vouchers. The Play button saves and loads a floor.
     ///
     /// Production runs in real time while you're in the hub. Offline catch-up
     /// (producing while the app is closed) comes in 5d.
@@ -18,14 +22,14 @@ namespace Game.Gameplay
     {
         [Header("Scene references")]
         [SerializeField] private Button _playButton;
-        [SerializeField] private StationView _stationView;
         [SerializeField] private IngredientHudView _ingredientHudView;
         [SerializeField] private CurrencyHudView _currencyHudView;
 
-        [Header("Bomb Bench")]
-        [SerializeField] private int _bombBenchIngredientCost = 3;
-        [SerializeField] private float _bombBenchProductionSeconds = 10f;
-        [SerializeField] private int _bombBenchBufferCapacity = 2;
+        [Header("Stations")]
+        [Tooltip("The Station Catalog asset holding every Producer station's tuning.")]
+        [SerializeField] private StationCatalogAsset _catalog;
+        [Tooltip("One panel per catalog station. Each panel's Station Output must match a catalog entry.")]
+        [SerializeField] private List<StationPanelView> _stationPanels;
 
         private IngredientInventoryRepository _ingredientRepository;
         private IngredientInventory _inventory;
@@ -33,7 +37,19 @@ namespace Game.Gameplay
         private BoosterInventory _boosters;
         private WalletRepository _walletRepository;
         private Wallet _wallet;
-        private ProducerStation _bombBench;
+        private StationProgressRepository _stationProgressRepository;
+
+        private readonly List<StationRuntime> _stationRuntimes = new List<StationRuntime>();
+
+        /// <summary>One catalog station's live state: its build progress, the ProducerStation it runs once built (null until then), and the panel showing it.</summary>
+        private class StationRuntime
+        {
+            public StationDefinition Definition;
+            public StationProgress Progress;
+            public ProducerStation Producer;
+            public StationPanelView Panel;
+            public Action AdvanceHandler;
+        }
 
         private void Awake()
         {
@@ -49,6 +65,14 @@ namespace Game.Gameplay
             {
                 _playButton.onClick.RemoveListener(Play);
             }
+
+            foreach (StationRuntime runtime in _stationRuntimes)
+            {
+                if (runtime.Panel != null)
+                {
+                    runtime.Panel.AdvancePressed -= runtime.AdvanceHandler;
+                }
+            }
         }
 
         private void Start()
@@ -59,35 +83,132 @@ namespace Game.Gameplay
             _boosters = _boosterRepository.Load();
             _walletRepository = new WalletRepository();
             _wallet = _walletRepository.Load();
+            _stationProgressRepository = new StationProgressRepository();
 
-            _bombBench = new ProducerStation(
-                BoosterType.Dynamite, TileType.Red,
-                _bombBenchIngredientCost, _bombBenchProductionSeconds, _bombBenchBufferCapacity, _inventory);
-
-            _stationView.Initialize(_bombBench, _boosters);
             _ingredientHudView.Initialize(_inventory);
             _currencyHudView.Initialize(_wallet);
+
+            BuildStations();
+        }
+
+        private void BuildStations()
+        {
+            if (_catalog == null)
+            {
+                Debug.LogWarning("GreenRoomController has no Station Catalog assigned - no stations will run.");
+                return;
+            }
+
+            IReadOnlyDictionary<BoosterType, int> savedLevels = _stationProgressRepository.LoadLevels();
+
+            foreach (StationTuning tuning in _catalog.stations)
+            {
+                StationPanelView panel = FindPanelFor(tuning.output);
+                if (panel == null)
+                {
+                    Debug.LogWarning($"No StationPanelView wired for {tuning.output} - check GreenRoomController's Station Panels list.");
+                    continue;
+                }
+
+                StationDefinition definition = tuning.BuildDefinition();
+                int initialLevel = ResolveInitialLevel(tuning, savedLevels);
+                var progress = new StationProgress(definition, _wallet, initialLevel);
+
+                var runtime = new StationRuntime { Definition = definition, Progress = progress, Panel = panel };
+                runtime.AdvanceHandler = () => HandleAdvancePressed(runtime);
+                panel.AdvancePressed += runtime.AdvanceHandler;
+
+                panel.Initialize(tuning.displayName, progress, _boosters, _wallet);
+                RebuildProducer(runtime);
+
+                _stationRuntimes.Add(runtime);
+            }
+        }
+
+        private static int ResolveInitialLevel(StationTuning tuning, IReadOnlyDictionary<BoosterType, int> savedLevels)
+        {
+            if (savedLevels.TryGetValue(tuning.output, out int savedLevel))
+            {
+                return savedLevel;
+            }
+
+            // No save entry for this station (first run, or a station added
+            // after the player's last save) - fall back to the catalog default.
+            return tuning.startsBuilt ? 1 : 0;
+        }
+
+        private StationPanelView FindPanelFor(BoosterType output)
+        {
+            foreach (StationPanelView panel in _stationPanels)
+            {
+                if (panel != null && panel.StationOutput == output)
+                {
+                    return panel;
+                }
+            }
+
+            return null;
         }
 
         private void Update()
         {
-            if (_bombBench == null)
+            foreach (StationRuntime runtime in _stationRuntimes)
+            {
+                if (runtime.Producer == null)
+                {
+                    continue;
+                }
+
+                runtime.Producer.Tick(Time.deltaTime);
+                AutoCollect(runtime);
+            }
+        }
+
+        private void AutoCollect(StationRuntime runtime)
+        {
+            int collected = runtime.Producer.Collect();
+            if (collected > 0)
+            {
+                _boosters.Add(runtime.Definition.Output, collected);
+                SaveAll();
+            }
+        }
+
+        private void HandleAdvancePressed(StationRuntime runtime)
+        {
+            if (!runtime.Progress.TryAdvance())
             {
                 return;
             }
 
-            _bombBench.Tick(Time.deltaTime);
-            AutoCollect();
+            RebuildProducer(runtime);
+            SaveAll();
         }
 
-        private void AutoCollect()
+        /// <summary>
+        /// (Re)creates the ProducerStation for a station's current level,
+        /// carrying over any uncollected boosters from the previous instance
+        /// (clamped to the new buffer capacity) so upgrading never loses stock.
+        /// </summary>
+        private void RebuildProducer(StationRuntime runtime)
         {
-            int collected = _bombBench.Collect();
-            if (collected > 0)
+            if (!runtime.Progress.IsBuilt)
             {
-                _boosters.Add(BoosterType.Dynamite, collected);
-                SaveAll();
+                runtime.Producer = null;
+                runtime.Panel.SetProducer(null);
+                return;
             }
+
+            StationLevelConfig config = runtime.Progress.CurrentConfig.Value;
+            int carriedBuffer = runtime.Producer != null ? runtime.Producer.BufferCount : 0;
+            int seedBuffer = Mathf.Min(carriedBuffer, config.BufferCapacity);
+
+            runtime.Producer = new ProducerStation(
+                runtime.Definition.Output, runtime.Definition.IngredientColor,
+                config.IngredientCost, config.ProductionSeconds, config.BufferCapacity,
+                _inventory, seedBuffer);
+
+            runtime.Panel.SetProducer(runtime.Producer);
         }
 
         private void Play()
@@ -101,6 +222,18 @@ namespace Game.Gameplay
             _ingredientRepository.Save(_inventory);
             _boosterRepository.Save(_boosters);
             _walletRepository.Save(_wallet);
+            SaveStationProgress();
+        }
+
+        private void SaveStationProgress()
+        {
+            var progresses = new List<StationProgress>(_stationRuntimes.Count);
+            foreach (StationRuntime runtime in _stationRuntimes)
+            {
+                progresses.Add(runtime.Progress);
+            }
+
+            _stationProgressRepository.Save(progresses);
         }
     }
 }

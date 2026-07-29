@@ -31,13 +31,20 @@ namespace Game.Core
         private readonly IngredientInventory _ingredients;
         private float _progress;
 
+        /// <param name="initialBufferCount">
+        /// Seeds the buffer with boosters already produced - used when a station
+        /// is upgraded and its ProducerStation instance is rebuilt with new
+        /// stats, so boosters waiting for collection aren't lost. Must not
+        /// exceed bufferCapacity.
+        /// </param>
         public ProducerStation(BoosterType output, TileType ingredientColor, int ingredientCost,
-            float productionSeconds, int bufferCapacity, IngredientInventory ingredients)
+            float productionSeconds, int bufferCapacity, IngredientInventory ingredients, int initialBufferCount = 0)
         {
             if (ingredientColor == TileType.None) throw new ArgumentOutOfRangeException(nameof(ingredientColor));
             if (ingredientCost <= 0) throw new ArgumentOutOfRangeException(nameof(ingredientCost));
             if (productionSeconds <= 0f) throw new ArgumentOutOfRangeException(nameof(productionSeconds));
             if (bufferCapacity <= 0) throw new ArgumentOutOfRangeException(nameof(bufferCapacity));
+            if (initialBufferCount < 0 || initialBufferCount > bufferCapacity) throw new ArgumentOutOfRangeException(nameof(initialBufferCount));
 
             Output = output;
             IngredientColor = ingredientColor;
@@ -45,6 +52,7 @@ namespace Game.Core
             ProductionSeconds = productionSeconds;
             BufferCapacity = bufferCapacity;
             _ingredients = ingredients ?? throw new ArgumentNullException(nameof(ingredients));
+            BufferCount = initialBufferCount;
         }
 
         public void Tick(float deltaSeconds)

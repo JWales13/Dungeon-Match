@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using Game.Core;
 
@@ -85,6 +86,27 @@ namespace Game.Tests
 
             Assert.AreEqual(2, collected);
             Assert.AreEqual(0, station.BufferCount);
+        }
+
+        [Test]
+        public void InitialBufferCount_SeedsBuffer_ForCarryingOverOnUpgrade()
+        {
+            var ingredients = new IngredientInventory();
+            var station = new ProducerStation(BoosterType.Dynamite, TileType.Red,
+                ingredientCost: 2, productionSeconds: 5f, bufferCapacity: 3, ingredients, initialBufferCount: 2);
+
+            Assert.AreEqual(2, station.BufferCount);
+            Assert.IsFalse(station.IsBufferFull);
+        }
+
+        [Test]
+        public void InitialBufferCount_AboveCapacity_Throws()
+        {
+            var ingredients = new IngredientInventory();
+
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                new ProducerStation(BoosterType.Dynamite, TileType.Red,
+                    ingredientCost: 2, productionSeconds: 5f, bufferCapacity: 2, ingredients, initialBufferCount: 3));
         }
     }
 }
