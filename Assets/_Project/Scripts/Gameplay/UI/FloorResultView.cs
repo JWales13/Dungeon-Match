@@ -8,27 +8,27 @@ using Game.Presentation;
 namespace Game.Gameplay
 {
     /// <summary>
-    /// Shows the win/lose result for a single floor, with a button to try
-    /// again. Renamed from RunFlowView - the old multi-room "run" is gone, so
-    /// this is just the floor result panel now.
+    /// The floor result panel. On a win it shows the rewards (Gold, Prize
+    /// Voucher, ingredients harvested); on a loss it shows the defeat banner.
+    /// For now both paths use one Exit button (Continue/Retry arrive in 5a-3b).
+    /// A presenter only - it displays and raises button events.
     /// </summary>
     public class FloorResultView : MonoBehaviour
     {
-        [FormerlySerializedAs("_runEndPanel")]
         [SerializeField] private GameObject _resultPanel;
-
-        [FormerlySerializedAs("_runEndText")]
         [SerializeField] private TMP_Text _resultText;
+        [SerializeField] private TMP_Text _rewardsText;
 
-        [SerializeField] private Button _restartButton;
+        [FormerlySerializedAs("_restartButton")]
+        [SerializeField] private Button _exitButton;
 
-        public event Action PlayAgainPressed;
+        public event Action ExitPressed;
 
         private void Awake()
         {
-            if (_restartButton != null)
+            if (_exitButton != null)
             {
-                _restartButton.onClick.AddListener(RaisePlayAgain);
+                _exitButton.onClick.AddListener(RaiseExit);
             }
 
             HideResult();
@@ -36,26 +36,46 @@ namespace Game.Gameplay
 
         private void OnDestroy()
         {
-            if (_restartButton != null)
+            if (_exitButton != null)
             {
-                _restartButton.onClick.RemoveListener(RaisePlayAgain);
+                _exitButton.onClick.RemoveListener(RaiseExit);
             }
         }
 
-        public void ShowResult(bool won)
+        public void ShowWin(int goldEarned, int vouchersEarned, string harvestSummary)
         {
-            if (_resultText != null)
+            ITheme theme = Theme.Current;
+
+            SetResultText(theme.FloorVictoryMessage, theme.VictoryColor);
+
+            if (_rewardsText != null)
             {
-                ITheme theme = Theme.Current;
-                _resultText.fontSize = theme.ResultFontSize;
-                _resultText.text = won ? theme.FloorVictoryMessage : theme.FloorDefeatMessage;
-                _resultText.color = won ? theme.VictoryColor : theme.DefeatColor;
+                _rewardsText.fontSize = theme.CaptionFontSize;
+                _rewardsText.color = theme.HudTextColor;
+                string rewards = $"Gold +{goldEarned}\nPrize Voucher +{vouchersEarned}";
+                if (!string.IsNullOrEmpty(harvestSummary))
+                {
+                    rewards += $"\nHarvested: {harvestSummary}";
+                }
+
+                _rewardsText.text = rewards;
             }
 
-            if (_resultPanel != null)
+            ShowPanel();
+        }
+
+        public void ShowFail()
+        {
+            ITheme theme = Theme.Current;
+
+            SetResultText(theme.FloorDefeatMessage, theme.DefeatColor);
+
+            if (_rewardsText != null)
             {
-                _resultPanel.SetActive(true);
+                _rewardsText.text = string.Empty;
             }
+
+            ShowPanel();
         }
 
         public void HideResult()
@@ -66,9 +86,29 @@ namespace Game.Gameplay
             }
         }
 
-        private void RaisePlayAgain()
+        private void SetResultText(string message, Color color)
         {
-            PlayAgainPressed?.Invoke();
+            if (_resultText == null)
+            {
+                return;
+            }
+
+            _resultText.fontSize = Theme.Current.ResultFontSize;
+            _resultText.text = message;
+            _resultText.color = color;
+        }
+
+        private void ShowPanel()
+        {
+            if (_resultPanel != null)
+            {
+                _resultPanel.SetActive(true);
+            }
+        }
+
+        private void RaiseExit()
+        {
+            ExitPressed?.Invoke();
         }
     }
 }
