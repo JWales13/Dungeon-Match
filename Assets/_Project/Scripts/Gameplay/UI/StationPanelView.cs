@@ -9,14 +9,21 @@ namespace Game.Gameplay
 {
     /// <summary>
     /// One station's panel in the Green Room: name, status (brewing / needs
-    /// ingredient / not built), booster stock, and a single Build/Upgrade
-    /// button whose label and cost change with the station's state. Replaces
-    /// the single-station StationView now that there are four of these.
+    /// ingredient / not built), booster stock, a Build/Upgrade button whose
+    /// label and cost change with the station's state, and a single gem
+    /// action button that context-switches between "Skip" (while brewing)
+    /// and "Top Up" (while idle, needing its ingredient) - Sponsor Bucks
+    /// sinks from GemExchange. Replaces the single-station StationView now
+    /// that there are four of these.
     ///
     /// Purely a presenter - GreenRoomController owns the StationProgress and
     /// (once built) the ProducerStation, and drives this view via
-    /// Initialize/SetProducer. This view never spends Prize Vouchers itself;
-    /// it only raises AdvancePressed and lets the controller decide.
+    /// Initialize/SetProducer. This view never spends currency itself; the
+    /// Build/Upgrade button raises AdvancePressed and lets the controller
+    /// decide, while the gem action button calls straight into the shared
+    /// GemExchange it's given (that's the one wallet-spending exception -
+    /// GemExchange already owns the spend/effect pairing, so routing it back
+    /// through the controller would just be an extra hop).
     /// </summary>
     public class StationPanelView : MonoBehaviour
     {
@@ -30,6 +37,8 @@ namespace Game.Gameplay
         [SerializeField] private TMP_Text _stockText;
         [SerializeField] private Button _advanceButton;
         [SerializeField] private TMP_Text _advanceButtonLabel;
+        [SerializeField] private Button _gemActionButton;
+        [SerializeField] private TMP_Text _gemActionButtonLabel;
 
         public BoosterType StationOutput => _stationOutput;
 
@@ -39,12 +48,19 @@ namespace Game.Gameplay
         private ProducerStation _producer;
         private BoosterInventory _boosters;
         private Wallet _wallet;
+        private GemExchange _gemExchange;
+        private IngredientInventory _ingredients;
 
         private void Awake()
         {
             if (_advanceButton != null)
             {
                 _advanceButton.onClick.AddListener(HandleAdvanceClicked);
+            }
+
+            if (_gemActionButton != null)
+            {
+                _gemActionButton.onClick.AddListener(HandleGemActionClicked);
             }
         }
 
@@ -55,16 +71,24 @@ namespace Game.Gameplay
                 _advanceButton.onClick.RemoveListener(HandleAdvanceClicked);
             }
 
+            if (_gemActionButton != null)
+            {
+                _gemActionButton.onClick.RemoveListener(HandleGemActionClicked);
+            }
+
             Unsubscribe();
         }
 
-        public void Initialize(string displayName, StationProgress progress, BoosterInventory boosters, Wallet wallet)
+        public void Initialize(string displayName, StationProgress progress, BoosterInventory boosters, Wallet wallet,
+            GemExchange gemExchange, IngredientInventory ingredients)
         {
             Unsubscribe();
 
             _progress = progress;
             _boosters = boosters;
             _wallet = wallet;
+            _gemExchange = gemExchange;
+            _ingredients = ingredients;
 
             ApplyStyle();
             if (_nameText != null)
@@ -111,6 +135,7 @@ namespace Game.Gameplay
             StyleLabel(_statusText, theme);
             StyleLabel(_stockText, theme);
             StyleLabel(_advanceButtonLabel, theme);
+            StyleLabel(_gemActionButtonLabel, theme);
         }
 
         private static void StyleLabel(TMP_Text label, ITheme theme)
@@ -126,9 +151,10 @@ namespace Game.Gameplay
 
         private void Update()
         {
-            // The brewing countdown needs a per-frame refresh; everything else
-            // only changes on an event.
+            // The brewing countdown (and the skip cost it drives) needs a
+            // per-frame refresh; everything else only changes on an event.
             RefreshStatus();
+            RefreshGemAction();
         }
 
         private void RefreshAll()
@@ -136,6 +162,7 @@ namespace Game.Gameplay
             RefreshStatus();
             RefreshStock();
             RefreshButton();
+            RefreshGemAction();
         }
 
         private void RefreshStatus()
@@ -196,6 +223,74 @@ namespace Game.Gameplay
         private void HandleAdvanceClicked()
         {
             AdvancePressed?.Invoke();
+        }
+
+        /// <summary>
+        /// The gem button does one of two things depending on state: while
+        /// brewing, it skips the timer; while idle (built, not brewing, buffer
+        /// not full), it tops up the station's ingredient color. It's hidden
+        /// otherwise (not built, or buffer full with nothing to skip/top up).
+        /// </summary>
+        private void RefreshGemAction()
+        {
+            if (_gemActionButton == null || _progress == null || _gemExchange == null)
+            {
+                return;
+            }
+
+            if (!_progress.IsBuilt || _producer == null)
+            {
+                SetGemAction(active: false);
+                return;
+            }
+
+            if (_producer.IsProducing)
+            {
+                int cost = _gemExchange.SkipCost(_producer.SecondsRemaining);
+                SetGemAction(active: true, $"Skip ({cost})", _wallet.GetBalance(CurrencyType.SponsorBucks) >= cost);
+                return;
+            }
+
+            if (_producer.IsBufferFull)
+            {
+                SetGemAction(active: false);
+                return;
+            }
+
+            int topUpCost = _gemExchange.IngredientTopUpCost;
+            SetGemAction(active: true, $"Top Up ({topUpCost})", _wallet.GetBalance(CurrencyType.SponsorBucks) >= topUpCost);
+        }
+
+        private void SetGemAction(bool active, string label = null, bool interactable = false)
+        {
+            _gemActionButton.gameObject.SetActive(active);
+            if (!active)
+            {
+                return;
+            }
+
+            _gemActionButton.interactable = interactable;
+            if (_gemActionButtonLabel != null)
+            {
+                _gemActionButtonLabel.text = label;
+            }
+        }
+
+        private void HandleGemActionClicked()
+        {
+            if (_gemExchange == null || _producer == null)
+            {
+                return;
+            }
+
+            if (_producer.IsProducing)
+            {
+                _gemExchange.TrySkipProduction(_producer);
+            }
+            else
+            {
+                _gemExchange.TryTopUpIngredients(_ingredients, _progress.Definition.IngredientColor);
+            }
         }
     }
 }

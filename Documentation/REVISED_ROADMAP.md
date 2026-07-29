@@ -3,22 +3,25 @@
 Supersedes the original `ROADMAP.md`. Sequenced to prove the core loop first,
 on a clean base. Status key: ✅ done · 🔨 in progress · ⬜ not started
 
-**Where we are:** Phases 0–5 complete. The Green Room now runs four Producer
+**Where we are:** Phases 0–6 complete. The Green Room runs four Producer
 stations (Bomb Bench, Goo Lab, Wire Rig, Mess Kit) off a data-driven Station
-Catalog: each has its own build cost, upgrade ladder, and ingredient/booster
-pairing, built/upgraded by spending Prize Vouchers. The full loop works: Play
-a floor → harvest → win pays Gold + a Prize Voucher (with an ingredient
-tally) → Exit to hub; lose → Continue (escalating Gold, +5 moves, same
-board) / Retry / Exit.
-Offline production catch-up (5d) is in too: stations fast-forward on launch
-for however long the app was closed, capped at 8 hours by default.
-**Next: Phase 6** — procedural floors & difficulty tiers.
-Test suite: 59 EditMode tests green.
+Catalog, built/upgraded with Prize Vouchers, with offline production
+catch-up. Floors are now depth-driven and endless: board size/monster
+HP/move limit/Gold reward scale with depth (TieredFloorGenerator), every 5th
+floor is a Main Event and every 10th a Sweeps Week (harder, better rewards,
+bonus ingredient harvest), and crate obstacles start appearing at depth 3,
+growing denser with depth. The full loop: Play a floor → harvest → win pays
+Gold + a Prize Voucher and advances depth → Exit to hub; lose → Continue
+(escalating Gold, +5 moves, same board) / Retry / Exit.
+**Next: Phase 7** — Daily Utilities & economy.
+Test suite: 92 EditMode tests green.
 
 Two currencies live: **Gold** (from wins; funds Continues) and **Prize
-Voucher** (+1 per win; funds Green Room station builds/upgrades). Deferred:
-visible upgrade art (Phase 8 juice pass). Outstanding small polish: rename
-the Play button to "Descend" (one-line scene edit, not yet done).
+Voucher** (+1 per win; funds Green Room station builds/upgrades). **Sponsor
+Bucks** (the premium currency) arrive in Phase 7. Deferred: visible upgrade
+art, crate/tier visual polish, per-hit crate feedback (Phase 8 juice pass).
+Outstanding small polish: rename the Play button to "Descend" (one-line
+scene edit, not yet done).
 
 ---
 
@@ -75,10 +78,15 @@ to a single-floor combat base. Kept board, combat, theme.
   window).
 - Deferred to Phase 8 (juice pass): visible upgrade art.
 
-### ⬜ Phase 6 — Procedural floors & difficulty tiers
-- Depth-driven floor generation. Tiers: Regular / Main Event (hard) / Sweeps
-  Week (super-hard), with rare-ingredient drops. Board obstacles introduced
-  gradually. Gold rewards scale with depth (first clear).
+### ✅ Phase 6 — Procedural floors & difficulty tiers
+- 6a: TowerProgress (persistent depth, advances on win only) +
+  FloorDifficultyCurve (depth → board size/HP/moves/gold, linear with caps).
+- 6b: FloorTierSchedule + TierMultipliers + TieredFloorGenerator - every 5th
+  floor a Main Event, every 10th a Sweeps Week, scaling HP/gold/ingredient
+  harvest.
+- 6c: Crate obstacles (CrateSchedule, Board.PlaceCrates/ResolveDetonation) -
+  inert to plain matching, only damaged by power-tile/blast hits, appearing
+  from depth 3 and growing denser, capped.
 
 ### ⬜ Phase 7 — Daily Utilities & economy
 - Daily-Utility stations (Mess Hall, Cot, Vending Machine) with once/day

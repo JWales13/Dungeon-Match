@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using TMPro;
 using Game.Core;
 
 namespace Game.Gameplay
@@ -37,6 +38,24 @@ namespace Game.Gameplay
         [Tooltip("Caps how much real-world offline time counts toward production, so a long absence doesn't bank an unbounded backlog beyond this window.")]
         [SerializeField] private float _maxOfflineSeconds = 8 * 60 * 60f; // 8 hours
 
+        [Header("Gem shop (Sponsor Bucks)")]
+        [Tooltip("Seconds of a station's remaining brew time bought per gem when skipping - lower is more expensive.")]
+        [SerializeField] private float _skipProductionSecondsPerGem = 10f;
+        [Tooltip("Gem cost of a station's ingredient top-up (per press).")]
+        [SerializeField] private int _ingredientTopUpCost = 5;
+        [Tooltip("Ingredients granted per top-up.")]
+        [SerializeField] private int _ingredientTopUpAmount = 20;
+        [Tooltip("Gem cost of a Gold purchase (per press).")]
+        [SerializeField] private int _goldPurchaseCost = 10;
+        [Tooltip("Gold granted per purchase.")]
+        [SerializeField] private int _goldPurchaseAmount = 100;
+        [SerializeField] private Button _buyGoldButton;
+        [SerializeField] private TMP_Text _buyGoldButtonLabel;
+
+        [Header("Debug")]
+        [Tooltip("Dev convenience only: adds this many Sponsor Bucks every time the Green Room loads, so the gem shop is testable before there's a real earn path (Daily Utilities / rewarded ads, both later work). 0 disables it.")]
+        [SerializeField] private int _debugSponsorBucksPerLoad = 0;
+
         private IngredientInventoryRepository _ingredientRepository;
         private IngredientInventory _inventory;
         private BoosterInventoryRepository _boosterRepository;
@@ -45,6 +64,7 @@ namespace Game.Gameplay
         private Wallet _wallet;
         private StationProgressRepository _stationProgressRepository;
         private OfflineClockRepository _offlineClockRepository;
+        private GemExchange _gemExchange;
 
         private readonly List<StationRuntime> _stationRuntimes = new List<StationRuntime>();
 
@@ -64,6 +84,11 @@ namespace Game.Gameplay
             {
                 _playButton.onClick.AddListener(Play);
             }
+
+            if (_buyGoldButton != null)
+            {
+                _buyGoldButton.onClick.AddListener(HandleBuyGoldClicked);
+            }
         }
 
         private void OnDestroy()
@@ -71,6 +96,16 @@ namespace Game.Gameplay
             if (_playButton != null)
             {
                 _playButton.onClick.RemoveListener(Play);
+            }
+
+            if (_buyGoldButton != null)
+            {
+                _buyGoldButton.onClick.RemoveListener(HandleBuyGoldClicked);
+            }
+
+            if (_wallet != null)
+            {
+                _wallet.Changed -= RefreshBuyGoldButton;
             }
 
             foreach (StationRuntime runtime in _stationRuntimes)
@@ -93,11 +128,23 @@ namespace Game.Gameplay
             _stationProgressRepository = new StationProgressRepository();
             _offlineClockRepository = new OfflineClockRepository();
 
+            var pricing = new GemPricing(_skipProductionSecondsPerGem, _ingredientTopUpCost,
+                _ingredientTopUpAmount, _goldPurchaseCost, _goldPurchaseAmount);
+            _gemExchange = new GemExchange(_wallet, pricing);
+
+            if (_debugSponsorBucksPerLoad > 0)
+            {
+                _wallet.Add(CurrencyType.SponsorBucks, _debugSponsorBucksPerLoad);
+            }
+
             _ingredientHudView.Initialize(_inventory);
             _currencyHudView.Initialize(_wallet);
 
             BuildStations();
             ApplyOfflineCatchUp();
+
+            _wallet.Changed += RefreshBuyGoldButton;
+            RefreshBuyGoldButton();
         }
 
         /// <summary>
@@ -154,7 +201,7 @@ namespace Game.Gameplay
                 runtime.AdvanceHandler = () => HandleAdvancePressed(runtime);
                 panel.AdvancePressed += runtime.AdvanceHandler;
 
-                panel.Initialize(tuning.displayName, progress, _boosters, _wallet);
+                panel.Initialize(tuning.displayName, progress, _boosters, _wallet, _gemExchange, _inventory);
                 RebuildProducer(runtime);
 
                 _stationRuntimes.Add(runtime);
@@ -251,6 +298,27 @@ namespace Game.Gameplay
         {
             SaveAll();
             SceneManager.LoadScene(SceneNames.Floor);
+        }
+
+        private void HandleBuyGoldClicked()
+        {
+            if (_gemExchange.TryBuyGold())
+            {
+                SaveAll();
+            }
+        }
+
+        private void RefreshBuyGoldButton()
+        {
+            if (_buyGoldButtonLabel != null)
+            {
+                _buyGoldButtonLabel.text = $"Buy Gold ({_goldPurchaseCost})";
+            }
+
+            if (_buyGoldButton != null)
+            {
+                _buyGoldButton.interactable = _wallet.GetBalance(CurrencyType.SponsorBucks) >= _goldPurchaseCost;
+            }
         }
 
         private void SaveAll()

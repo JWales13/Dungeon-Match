@@ -65,6 +65,7 @@ namespace Game.Presentation
             {
                 case CurrencyType.Gold:         return "Gold";
                 case CurrencyType.PrizeVoucher: return "Prize Vouchers";
+                case CurrencyType.SponsorBucks: return "Sponsor Bucks";
                 default:                        return "?";
             }
         }

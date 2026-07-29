@@ -5,14 +5,14 @@ using Game.Presentation;
 
 namespace Game.Gameplay
 {
-    /// <summary>Shows the player's currency balances (Gold, Prize Vouchers).</summary>
+    /// <summary>Shows the player's currency balances (Gold, Prize Vouchers, Sponsor Bucks).</summary>
     public class CurrencyHudView : MonoBehaviour
     {
         [SerializeField] private TMP_Text _text;
 
         private static readonly CurrencyType[] DisplayOrder =
         {
-            CurrencyType.Gold, CurrencyType.PrizeVoucher
+            CurrencyType.Gold, CurrencyType.PrizeVoucher, CurrencyType.SponsorBucks
         };
 
         private Wallet _wallet;
