@@ -41,6 +41,11 @@ namespace Game.Gameplay
         [SerializeField] private int _goldPerWin = 25;
         [SerializeField] private int _prizeVouchersPerWin = 1;
 
+        [Header("Continue (on fail)")]
+        [SerializeField] private int _continueBaseCost = 20;
+        [SerializeField] private int _continueCostStep = 20;
+        [SerializeField] private int _extraMovesPerContinue = 5;
+
         private IngredientInventoryRepository _ingredientRepository;
         private IngredientInventory _inventory;
         private BoosterInventoryRepository _boosterRepository;
@@ -57,12 +62,15 @@ namespace Game.Gameplay
 
         private bool _dynamiteArmed;
         private bool _dynamiteUsedThisFloor;
+        private int _continuesUsedThisFloor;
 
         private void Awake()
         {
             _inputController.SwapRequested += HandleSwapRequested;
             _inputController.CellTapped += HandleCellTapped;
             _floorResultView.ExitPressed += HandleExit;
+            _floorResultView.ContinuePressed += HandleContinuePressed;
+            _floorResultView.RetryPressed += HandleRetryPressed;
             _loadoutView.UseDynamitePressed += HandleUseDynamitePressed;
         }
 
@@ -92,6 +100,8 @@ namespace Game.Gameplay
             if (_floorResultView != null)
             {
                 _floorResultView.ExitPressed -= HandleExit;
+                _floorResultView.ContinuePressed -= HandleContinuePressed;
+                _floorResultView.RetryPressed -= HandleRetryPressed;
             }
 
             if (_loadoutView != null)
@@ -124,6 +134,7 @@ namespace Game.Gameplay
             _combatHudView.Initialize(_objective);
             _floorResultView.HideResult();
 
+            _continuesUsedThisFloor = 0;
             _dynamiteArmed = false;
             _dynamiteUsedThisFloor = false;
             _acceptingInput = true;
@@ -157,7 +168,9 @@ namespace Game.Gameplay
             else
             {
                 SaveAll();
-                _floorResultView.ShowFail();
+                int continueCost = CurrentContinueCost();
+                bool canAfford = _wallet.GetBalance(CurrencyType.Gold) >= continueCost;
+                _floorResultView.ShowFail(continueCost, canAfford);
             }
         }
 
@@ -233,6 +246,33 @@ namespace Game.Gameplay
         private void HandleExit()
         {
             SceneManager.LoadScene(SceneNames.GreenRoom);
+        }
+
+        private void HandleContinuePressed()
+        {
+            int cost = CurrentContinueCost();
+            if (!_wallet.TrySpend(CurrencyType.Gold, cost))
+            {
+                return;
+            }
+
+            _continuesUsedThisFloor++;
+            _walletRepository.Save(_wallet);
+            _objective.Continue(_extraMovesPerContinue); // revives the same board with +moves
+
+            _floorResultView.HideResult();
+            _acceptingInput = true;
+            RefreshLoadout();
+        }
+
+        private void HandleRetryPressed()
+        {
+            LoadFloor(); // fresh board, same difficulty, free
+        }
+
+        private int CurrentContinueCost()
+        {
+            return _continueBaseCost + (_continueCostStep * _continuesUsedThisFloor);
         }
 
         private void SaveAll()

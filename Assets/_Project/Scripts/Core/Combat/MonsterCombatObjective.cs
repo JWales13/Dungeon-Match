@@ -18,7 +18,7 @@ namespace Game.Core
     {
         public int MaxHealth { get; }
         public int CurrentHealth { get; private set; }
-        public int MoveLimit { get; }
+        public int MoveLimit { get; private set; }
         public int MovesUsed { get; private set; }
         public int MovesRemaining => MoveLimit - MovesUsed;
         public ObjectiveStatus Status { get; private set; } = ObjectiveStatus.InProgress;
@@ -72,6 +72,23 @@ namespace Game.Core
             {
                 SetStatus(ObjectiveStatus.Lost);
             }
+        }
+
+        /// <summary>
+        /// Revives a lost floor with extra moves (a paid Continue). Only valid
+        /// when the floor was actually lost; the board is left untouched, so
+        /// play resumes exactly where it stopped.
+        /// </summary>
+        public void Continue(int extraMoves)
+        {
+            if (Status != ObjectiveStatus.Lost || extraMoves <= 0)
+            {
+                return;
+            }
+
+            MoveLimit += extraMoves;
+            Status = ObjectiveStatus.InProgress;
+            MovesChanged?.Invoke(MovesRemaining, MoveLimit);
         }
 
         private void ApplyDamage(int amount)

@@ -68,6 +68,30 @@ namespace Game.Tests
         }
 
         [Test]
+        public void Continue_RevivesLostFloor_WithExtraMoves()
+        {
+            var objective = new MonsterCombatObjective(monsterHealth: 100, moveLimit: 1);
+            objective.SpendMove(); // out of moves, monster alive -> Lost
+            Assert.AreEqual(ObjectiveStatus.Lost, objective.Status);
+
+            objective.Continue(5);
+
+            Assert.AreEqual(ObjectiveStatus.InProgress, objective.Status);
+            Assert.AreEqual(5, objective.MovesRemaining);
+        }
+
+        [Test]
+        public void Continue_DoesNothing_WhenNotLost()
+        {
+            var objective = new MonsterCombatObjective(monsterHealth: 100, moveLimit: 5);
+
+            objective.Continue(5);
+
+            Assert.AreEqual(ObjectiveStatus.InProgress, objective.Status);
+            Assert.AreEqual(5, objective.MovesRemaining); // unchanged
+        }
+
+        [Test]
         public void ActionsAfterResolution_AreIgnored()
         {
             var objective = new MonsterCombatObjective(monsterHealth: 3, moveLimit: 5);
