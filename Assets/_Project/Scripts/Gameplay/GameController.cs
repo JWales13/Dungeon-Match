@@ -8,11 +8,14 @@ using Game.Presentation;
 namespace Game.Gameplay
 {
     /// <summary>
-    /// The Floor scene's controller: plays one combat floor. Loads the stashes
-    /// and wallet, runs the board and the in-floor Dynamite, tallies the
-    /// ingredients harvested this floor, and on a win pays out Gold + a Prize
-    /// Voucher. On floor end it saves and shows the result; Exit returns to the
-    /// Green Room. Crafting (the Bomb Bench) lives in the Green Room.
+    /// The Floor scene's controller: plays one combat floor. Loads the
+    /// stashes, wallet, and tower depth; asks FloorDifficultyCurve for that
+    /// depth's FloorSpec (board size, monster HP, move limit, Gold reward);
+    /// runs the board and the in-floor Dynamite; tallies ingredients
+    /// harvested; and on a win pays out Gold + a Prize Voucher and advances
+    /// depth one floor deeper. On floor end it saves and shows the result;
+    /// Exit returns to the Green Room. Crafting (the Bomb Bench et al.) lives
+    /// in the Green Room.
     /// </summary>
     public class GameController : MonoBehaviour
     {
@@ -27,18 +30,26 @@ namespace Game.Gameplay
         [SerializeField] private IngredientHudView _ingredientHudView;
         [SerializeField] private BoosterLoadoutView _loadoutView;
 
-        [Header("Board size")]
-        [SerializeField] private int _boardWidth = 8;
-        [SerializeField] private int _boardHeight = 8;
+        [Header("Difficulty curve (depth-driven - see FloorDifficultyCurve)")]
+        [SerializeField] private int _baseMonsterHealth = 30;
+        [SerializeField] private int _monsterHealthPerDepth = 6;
+        [SerializeField] private int _baseMoveLimit = 15;
+        [SerializeField] private int _moveLimitPerDepth = 1;
+        [SerializeField] private int _maxMoveLimit = 20;
+        [Tooltip("Board size growth is 0 by default - BoardView doesn't yet re-fit the camera to a " +
+                 "changing board, so a non-zero value here will run tiles off-screen. Leave at 0 until " +
+                 "that view work lands.")]
+        [SerializeField] private int _baseBoardSize = 8;
+        [SerializeField] private int _boardSizePerDepth = 0;
+        [SerializeField] private int _maxBoardSize = 8;
+        [SerializeField] private int _baseGoldReward = 25;
+        [SerializeField] private int _goldRewardPerDepth = 5;
 
         [Header("Floor tuning")]
-        [SerializeField] private int _monsterHealth = 30;
-        [SerializeField] private int _moveLimit = 15;
         [SerializeField] private int _damagePerTile = 1;
         [SerializeField] private int _ingredientsPerDetonation = 2;
 
         [Header("Win rewards")]
-        [SerializeField] private int _goldPerWin = 25;
         [SerializeField] private int _prizeVouchersPerWin = 1;
 
         [Header("Continue (on fail)")]
@@ -52,6 +63,10 @@ namespace Game.Gameplay
         private BoosterInventory _boosters;
         private WalletRepository _walletRepository;
         private Wallet _wallet;
+        private TowerProgressRepository _towerProgressRepository;
+        private TowerProgress _towerProgress;
+        private FloorDifficultyCurve _difficultyCurve;
+        private FloorSpec _currentFloorSpec;
 
         private Board _board;
         private MonsterCombatObjective _objective;
@@ -83,6 +98,14 @@ namespace Game.Gameplay
             _boosters.Changed += RefreshLoadout;
             _walletRepository = new WalletRepository();
             _wallet = _walletRepository.Load();
+            _towerProgressRepository = new TowerProgressRepository();
+            _towerProgress = _towerProgressRepository.Load();
+
+            _difficultyCurve = new FloorDifficultyCurve(
+                _baseMonsterHealth, _monsterHealthPerDepth,
+                _baseMoveLimit, _moveLimitPerDepth, _maxMoveLimit,
+                _baseBoardSize, _boardSizePerDepth, _maxBoardSize,
+                _baseGoldReward, _goldRewardPerDepth);
 
             _ingredientHudView.Initialize(_inventory);
 
@@ -121,8 +144,10 @@ namespace Game.Gameplay
         {
             UnsubscribeObjective();
 
-            _board = new Board(_boardWidth, _boardHeight, new MatchFinder());
-            _objective = new MonsterCombatObjective(_monsterHealth, _moveLimit, _damagePerTile);
+            _currentFloorSpec = _difficultyCurve.Generate(_towerProgress.CurrentDepth);
+
+            _board = new Board(_currentFloorSpec.BoardSize, _currentFloorSpec.BoardSize, new MatchFinder());
+            _objective = new MonsterCombatObjective(_currentFloorSpec.MonsterHealth, _currentFloorSpec.MoveLimit, _damagePerTile);
             _objectiveDriver = new BoardObjectiveDriver(_board, _objective);
             _harvester = new IngredientHarvester(_board, _inventory, _ingredientsPerDetonation);
             _objective.StatusChanged += HandleObjectiveStatusChanged;
@@ -132,6 +157,7 @@ namespace Game.Gameplay
 
             _boardView.Initialize(_board);
             _combatHudView.Initialize(_objective);
+            _combatHudView.SetDepth(_currentFloorSpec.Depth);
             _floorResultView.HideResult();
 
             _continuesUsedThisFloor = 0;
@@ -160,10 +186,12 @@ namespace Game.Gameplay
 
             if (status == ObjectiveStatus.Won)
             {
-                _wallet.Add(CurrencyType.Gold, _goldPerWin);
+                int goldEarned = _currentFloorSpec.GoldReward;
+                _wallet.Add(CurrencyType.Gold, goldEarned);
                 _wallet.Add(CurrencyType.PrizeVoucher, _prizeVouchersPerWin);
+                _towerProgress.AdvanceDepth(); // next Play/Descend starts one floor deeper
                 SaveAll();
-                _floorResultView.ShowWin(_goldPerWin, _prizeVouchersPerWin, BuildHarvestSummary());
+                _floorResultView.ShowWin(goldEarned, _prizeVouchersPerWin, BuildHarvestSummary());
             }
             else
             {
@@ -280,6 +308,7 @@ namespace Game.Gameplay
             _ingredientRepository.Save(_inventory);
             _boosterRepository.Save(_boosters);
             _walletRepository.Save(_wallet);
+            _towerProgressRepository.Save(_towerProgress);
         }
 
         private void UnsubscribeObjective()

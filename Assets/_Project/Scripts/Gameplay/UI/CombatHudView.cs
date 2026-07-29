@@ -6,16 +6,18 @@ using Game.Presentation;
 namespace Game.Gameplay
 {
     /// <summary>
-    /// Displays monster HP, remaining moves, and the win/lose result. Every
-    /// visual value (text color, font size, result strings and their colors)
-    /// comes from the active Theme and is applied in code, so the HUD is styled
-    /// without touching the TMP components in the Inspector.
+    /// Displays monster HP, remaining moves, current tower depth, and the
+    /// win/lose result. Every visual value (text color, font size, result
+    /// strings and their colors) comes from the active Theme and is applied
+    /// in code, so the HUD is styled without touching the TMP components in
+    /// the Inspector.
     /// </summary>
     public class CombatHudView : MonoBehaviour
     {
         [SerializeField] private TMP_Text _healthText;
         [SerializeField] private TMP_Text _movesText;
         [SerializeField] private TMP_Text _resultText;
+        [SerializeField] private TMP_Text _depthText;
 
         private MonsterCombatObjective _objective;
 
@@ -33,6 +35,15 @@ namespace Game.Gameplay
             HandleHealthChanged(objective.CurrentHealth, objective.MaxHealth);
             HandleMovesChanged(objective.MovesRemaining, objective.MoveLimit);
             ClearResult();
+        }
+
+        /// <summary>Set once per floor load - depth doesn't change mid-floor, so this isn't event-driven.</summary>
+        public void SetDepth(int depth)
+        {
+            if (_depthText != null)
+            {
+                _depthText.text = $"Floor {depth}";
+            }
         }
 
         private void OnDestroy()
@@ -62,6 +73,7 @@ namespace Game.Gameplay
 
             StyleLabel(_healthText, theme.HudTextColor, theme.HudLabelFontSize);
             StyleLabel(_movesText, theme.HudTextColor, theme.HudLabelFontSize);
+            StyleLabel(_depthText, theme.HudTextColor, theme.CaptionFontSize);
 
             if (_resultText != null)
             {

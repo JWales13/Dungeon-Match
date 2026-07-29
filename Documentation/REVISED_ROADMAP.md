@@ -109,3 +109,4 @@ half once the loop is proven.
 - Commit at the end of every phase (summary + description provided each time).
 - Every new rule class in `Game.Core` ships with EditMode tests.
 - Keep styling in the theme; keep the Core/Presentation/Gameplay split.
+
