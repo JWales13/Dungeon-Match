@@ -62,6 +62,17 @@ small square).
 | Power tile highlight | 0.45  | How far a power tile's color blends toward white (0-1) |
 | Power tile thickness | 0.40  | The thin edge of a power-tile bar (long edge = Tile scale) |
 
+## Crates (board obstacles)
+
+Placeholder look for the demo: a crate darkens toward an "obstacle" brown-gray
+regardless of remaining hits (per-hit visual feedback is a Phase 8 juice-pass
+item, not implemented yet).
+
+| Token               | Value                | Use                                      |
+|---------------------|-----------------------|-------------------------------------------|
+| Crate overlay color | `#3C3830` (60,56,48) | The color a crate's tile blends toward    |
+| Crate overlay amount| 0.65                 | How far a crate's color blends toward it (0-1) |
+
 ## Typography
 
 TextMeshPro for all text. Sizes in TMP font-size units. Applied in code from

@@ -85,5 +85,19 @@ namespace Game.Tests
 
             Assert.AreEqual(0, groups.Count);
         }
+
+        [Test]
+        public void CratesAreInertToMatching()
+        {
+            // Three reds in a row, but the middle one is a crate -> no run.
+            var grid = Grid(3, 1);
+            grid[0, 0] = new Tile(TileType.Red);
+            grid[1, 0] = new Tile(TileType.Red, PowerTileKind.None, crateHits: 2);
+            grid[2, 0] = new Tile(TileType.Red);
+
+            IReadOnlyList<MatchGroup> groups = new MatchFinder().FindMatches(grid);
+
+            Assert.AreEqual(0, groups.Count);
+        }
     }
 }

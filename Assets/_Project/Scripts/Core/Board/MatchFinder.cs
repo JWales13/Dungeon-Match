@@ -5,10 +5,11 @@ namespace Game.Core
 {
     /// <summary>
     /// Default match rules: straight runs of 3+ (horizontal and vertical) and
-    /// 2x2 squares of one color. Power tiles and empties are inert - they never
-    /// form or extend a run/square - so a power tile just sits until moved.
-    /// Each responsibility (scan a direction, record a run, find squares) is its
-    /// own small method.
+    /// 2x2 squares of one color. Power tiles, crates, and empties are inert -
+    /// they never form or extend a run/square - so a power tile just sits
+    /// until moved, and a crate just sits until a power-tile/blast pattern
+    /// damages it (see Board.ResolveDetonation). Each responsibility (scan a
+    /// direction, record a run, find squares) is its own small method.
     /// </summary>
     public class MatchFinder : IMatchFinder
     {
@@ -23,7 +24,7 @@ namespace Game.Core
             return groups;
         }
 
-        private static bool IsMatchable(Tile tile) => !tile.IsEmpty && !tile.IsPowerTile;
+        private static bool IsMatchable(Tile tile) => !tile.IsEmpty && !tile.IsPowerTile && !tile.IsCrate;
 
         private static bool SameColor(Tile a, Tile b) => IsMatchable(a) && IsMatchable(b) && a.Type == b.Type;
 

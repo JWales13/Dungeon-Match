@@ -8,8 +8,11 @@ namespace Game.Core
     /// <summary>
     /// Owns the grid and every rule for mutating it: swapping, creating power
     /// tiles from large matches, detonating power tiles when the player moves
-    /// them (with chain reactions), clearing, gravity, and refill. Pure C# -
-    /// no MonoBehaviour, no rendering, no input - so all of it is unit tested.
+    /// them (with chain reactions), clearing, gravity, refill, and crate
+    /// obstacles (inert to plain matching/swapping - see PlaceCrates - and
+    /// only damaged, not necessarily destroyed, when a power-tile/blast
+    /// pattern passes over their cell - see ResolveDetonation). Pure C# - no
+    /// MonoBehaviour, no rendering, no input - so all of it is unit tested.
     ///
     /// Events (unchanged contract for the view/harvest layers):
     ///  - TilesSwapped(a, b): two cells exchanged (including a reverted swap).
@@ -37,8 +40,13 @@ namespace Game.Core
         private readonly IMatchFinder _matchFinder;
         private readonly Random _random;
 
-        /// <summary>Creates a randomly filled board with no starting matches.</summary>
-        public Board(int width, int height, IMatchFinder matchFinder, int? randomSeed = null)
+        /// <summary>
+        /// Creates a randomly filled board with no starting matches, then
+        /// optionally scatters crateCount crates (each needing crateHits
+        /// power-tile/blast hits to break) across random cells.
+        /// </summary>
+        public Board(int width, int height, IMatchFinder matchFinder, int? randomSeed = null,
+            int crateCount = 0, int crateHits = 1)
         {
             Width = width;
             Height = height;
@@ -47,6 +55,7 @@ namespace Game.Core
             _grid = new Tile[width, height];
 
             FillWithoutStartingMatches();
+            PlaceCrates(crateCount, crateHits);
         }
 
         /// <summary>Creates a board from an explicit grid (used by tests).</summary>
@@ -284,6 +293,19 @@ namespace Game.Core
                     continue;
                 }
 
+                if (tile.IsCrate)
+                {
+                    Tile damaged = tile.Damaged();
+                    _grid[cell.x, cell.y] = damaged;
+
+                    if (damaged.IsCrate)
+                    {
+                        continue; // took a hit, survives - not cleared, doesn't chain further
+                    }
+
+                    // Durability hit zero: breaks just like any other cleared cell, below.
+                }
+
                 clearedSet.Add(cell);
                 cleared.Add(cell);
 
@@ -469,6 +491,49 @@ namespace Game.Core
         {
             int colorCount = Enum.GetValues(typeof(TileType)).Length - 1; // exclude None
             return (TileType)_random.Next(0, colorCount);
+        }
+
+        /// <summary>
+        /// Converts crateCount already-filled cells (picked uniformly at
+        /// random) into crates, keeping each cell's existing color as the
+        /// crate's flavor color. Safe to layer on top of
+        /// FillWithoutStartingMatches: excluding a tile from matching (which
+        /// is all a crate does) can only remove matches, never create one.
+        /// </summary>
+        private void PlaceCrates(int crateCount, int crateHits)
+        {
+            if (crateCount <= 0)
+            {
+                return;
+            }
+
+            var cells = new List<Vector2Int>(Width * Height);
+            for (int x = 0; x < Width; x++)
+            {
+                for (int y = 0; y < Height; y++)
+                {
+                    cells.Add(new Vector2Int(x, y));
+                }
+            }
+
+            ShuffleInPlace(cells);
+
+            int count = Mathf.Min(crateCount, cells.Count);
+            for (int i = 0; i < count; i++)
+            {
+                Vector2Int cell = cells[i];
+                Tile existing = _grid[cell.x, cell.y];
+                _grid[cell.x, cell.y] = new Tile(existing.Type, PowerTileKind.None, crateHits);
+            }
+        }
+
+        private void ShuffleInPlace(List<Vector2Int> cells)
+        {
+            for (int i = cells.Count - 1; i > 0; i--)
+            {
+                int j = _random.Next(i + 1);
+                (cells[i], cells[j]) = (cells[j], cells[i]);
+            }
         }
 
         private void ThrowIfOutOfBounds(Vector2Int position)

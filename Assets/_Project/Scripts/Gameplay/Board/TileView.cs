@@ -8,8 +8,11 @@ namespace Game.Gameplay
     /// The visual representation of a single cell. Displays a Tile: normal tiles
     /// are a full-size colored square; power tiles are brighter and shaped to
     /// hint their effect (column-clearer = vertical bar, row-clearer =
-    /// horizontal bar, mortar = small square). All values come from the active
-    /// Theme, so this script never changes when the look is retuned.
+    /// horizontal bar, mortar = small square); crates are darkened toward an
+    /// "obstacle" color regardless of remaining hits (a placeholder look -
+    /// per-hit visual feedback is a Phase 8 juice-pass item). All values come
+    /// from the active Theme, so this script never changes when the look is
+    /// retuned.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer))]
     public class TileView : MonoBehaviour
@@ -27,6 +30,13 @@ namespace Game.Gameplay
 
             ITheme theme = Theme.Current;
             Color baseColor = theme.GetTileColor(tile.Type);
+
+            if (tile.IsCrate)
+            {
+                _spriteRenderer.color = Color.Lerp(baseColor, theme.CrateOverlayColor, theme.CrateOverlayAmount);
+                transform.localScale = Vector3.one * theme.TileScale;
+                return;
+            }
 
             if (!tile.IsPowerTile)
             {

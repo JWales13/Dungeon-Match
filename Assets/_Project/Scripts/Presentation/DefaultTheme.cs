@@ -73,6 +73,10 @@ namespace Game.Presentation
         public float PowerTileHighlightAmount => 0.45f;
         public float PowerTileThickness => 0.4f;
 
+        // Crates
+        public Color CrateOverlayColor => new Color32(60, 56, 48, 255); // dark "wood crate" brown-gray
+        public float CrateOverlayAmount => 0.65f;
+
         // HUD text
         public Color HudTextColor => new Color32(237, 237, 237, 255);   // #EDEDED off-white
         public float HudLabelFontSize => 28f;

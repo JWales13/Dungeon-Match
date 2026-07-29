@@ -12,8 +12,11 @@ namespace Game.Gameplay
     /// stashes, wallet, and tower depth; asks TieredFloorGenerator for that
     /// depth's FloorSpec (board size, monster HP, move limit, Gold reward,
     /// tier, ingredient multiplier - Main Event/Sweeps Week floors hit
-    /// harder and pay/harvest more); runs the board and the in-floor
-    /// Dynamite; tallies ingredients harvested; and on a win pays out Gold +
+    /// harder and pay/harvest more), and CrateSchedule for how many crate
+    /// obstacles to scatter (none before a starting depth, then a growing,
+    /// capped percentage of the board - see Board.PlaceCrates); runs the
+    /// board and the in-floor Dynamite; tallies ingredients harvested; and
+    /// on a win pays out Gold +
     /// a Prize Voucher and advances depth one floor deeper. On floor end it
     /// saves and shows the result; Exit returns to the Green Room. Crafting
     /// (the Bomb Bench et al.) lives in the Green Room.
@@ -58,6 +61,15 @@ namespace Game.Gameplay
         [SerializeField] private float _sweepsWeekGoldMultiplier = 2.5f;
         [SerializeField] private int _sweepsWeekIngredientMultiplier = 3;
 
+        [Header("Crate obstacles")]
+        [Tooltip("No crates before this depth.")]
+        [SerializeField] private int _crateStartingDepth = 3;
+        [Range(0f, 1f)] [SerializeField] private float _crateBasePercentage = 0.10f;
+        [Range(0f, 1f)] [SerializeField] private float _cratePercentagePerDepth = 0.02f;
+        [Range(0f, 1f)] [SerializeField] private float _crateMaxPercentage = 0.25f;
+        [Tooltip("Power-tile/blast hits needed to break one crate.")]
+        [SerializeField] private int _crateHits = 2;
+
         [Header("Floor tuning")]
         [SerializeField] private int _damagePerTile = 1;
         [SerializeField] private int _ingredientsPerDetonation = 2;
@@ -79,6 +91,7 @@ namespace Game.Gameplay
         private TowerProgressRepository _towerProgressRepository;
         private TowerProgress _towerProgress;
         private TieredFloorGenerator _floorGenerator;
+        private CrateSchedule _crateSchedule;
         private FloorSpec _currentFloorSpec;
 
         private Board _board;
@@ -124,6 +137,7 @@ namespace Game.Gameplay
                 difficultyCurve, tierSchedule,
                 new TierMultipliers(_mainEventHealthMultiplier, _mainEventGoldMultiplier, _mainEventIngredientMultiplier),
                 new TierMultipliers(_sweepsWeekHealthMultiplier, _sweepsWeekGoldMultiplier, _sweepsWeekIngredientMultiplier));
+            _crateSchedule = new CrateSchedule(_crateStartingDepth, _crateBasePercentage, _cratePercentagePerDepth, _crateMaxPercentage);
 
             _ingredientHudView.Initialize(_inventory);
 
@@ -164,8 +178,10 @@ namespace Game.Gameplay
 
             _currentFloorSpec = _floorGenerator.Generate(_towerProgress.CurrentDepth);
             int ingredientYield = _ingredientsPerDetonation * _currentFloorSpec.IngredientMultiplier;
+            int crateCount = _crateSchedule.CrateCountFor(_currentFloorSpec.Depth, _currentFloorSpec.BoardSize, _currentFloorSpec.BoardSize);
 
-            _board = new Board(_currentFloorSpec.BoardSize, _currentFloorSpec.BoardSize, new MatchFinder());
+            _board = new Board(_currentFloorSpec.BoardSize, _currentFloorSpec.BoardSize, new MatchFinder(),
+                crateCount: crateCount, crateHits: _crateHits);
             _objective = new MonsterCombatObjective(_currentFloorSpec.MonsterHealth, _currentFloorSpec.MoveLimit, _damagePerTile);
             _objectiveDriver = new BoardObjectiveDriver(_board, _objective);
             _harvester = new IngredientHarvester(_board, _inventory, ingredientYield);

@@ -40,6 +40,13 @@ namespace Game.Presentation
         // horizontal bars, and mortars as small squares.
         float PowerTileThickness { get; }
 
+        // --- Crates (board obstacles) ---
+        // The color a crate's tile blends toward, so it reads as "obstacle"
+        // regardless of its underlying flavor color.
+        Color CrateOverlayColor { get; }
+        // How far a crate's color is blended toward CrateOverlayColor (0-1).
+        float CrateOverlayAmount { get; }
+
         // --- HUD text ---
         Color HudTextColor { get; }
         float HudLabelFontSize { get; }   // primary labels (HP, moves)
