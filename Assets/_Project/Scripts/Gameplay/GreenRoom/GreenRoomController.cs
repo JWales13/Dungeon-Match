@@ -15,8 +15,10 @@ namespace Game.Gameplay
     /// its StationPanelView so Build/Upgrade button presses spend Prize
     /// Vouchers. The Play button saves and loads a floor.
     ///
-    /// Production runs in real time while you're in the hub. Offline catch-up
-    /// (producing while the app is closed) comes in 5d.
+    /// Production runs in real time while you're in the hub, plus a one-shot
+    /// catch-up at Start for however long the app was closed (see
+    /// ApplyOfflineCatchUp / ProducerStation.FastForward), capped at
+    /// _maxOfflineSeconds so a long absence can't bank an unbounded backlog.
     /// </summary>
     public class GreenRoomController : MonoBehaviour
     {
@@ -31,6 +33,10 @@ namespace Game.Gameplay
         [Tooltip("One panel per catalog station. Each panel's Station Output must match a catalog entry.")]
         [SerializeField] private List<StationPanelView> _stationPanels;
 
+        [Header("Offline catch-up")]
+        [Tooltip("Caps how much real-world offline time counts toward production, so a long absence doesn't bank an unbounded backlog beyond this window.")]
+        [SerializeField] private float _maxOfflineSeconds = 8 * 60 * 60f; // 8 hours
+
         private IngredientInventoryRepository _ingredientRepository;
         private IngredientInventory _inventory;
         private BoosterInventoryRepository _boosterRepository;
@@ -38,6 +44,7 @@ namespace Game.Gameplay
         private WalletRepository _walletRepository;
         private Wallet _wallet;
         private StationProgressRepository _stationProgressRepository;
+        private OfflineClockRepository _offlineClockRepository;
 
         private readonly List<StationRuntime> _stationRuntimes = new List<StationRuntime>();
 
@@ -84,11 +91,40 @@ namespace Game.Gameplay
             _walletRepository = new WalletRepository();
             _wallet = _walletRepository.Load();
             _stationProgressRepository = new StationProgressRepository();
+            _offlineClockRepository = new OfflineClockRepository();
 
             _ingredientHudView.Initialize(_inventory);
             _currencyHudView.Initialize(_wallet);
 
             BuildStations();
+            ApplyOfflineCatchUp();
+        }
+
+        /// <summary>
+        /// Fast-forwards every built station's producer by however long the
+        /// Green Room was last closed, capped at _maxOfflineSeconds, then
+        /// stamps the clock so the next launch measures from now. Boosters
+        /// completed this way land in each producer's buffer same as always -
+        /// the normal Update loop collects them into the stash next frame.
+        /// </summary>
+        private void ApplyOfflineCatchUp()
+        {
+            DateTime? lastSaved = _offlineClockRepository.Load();
+            DateTime now = DateTime.UtcNow;
+
+            if (lastSaved.HasValue)
+            {
+                float elapsedSeconds = Mathf.Clamp((float)(now - lastSaved.Value).TotalSeconds, 0f, _maxOfflineSeconds);
+                if (elapsedSeconds > 0f)
+                {
+                    foreach (StationRuntime runtime in _stationRuntimes)
+                    {
+                        runtime.Producer?.FastForward(elapsedSeconds);
+                    }
+                }
+            }
+
+            _offlineClockRepository.Save(now);
         }
 
         private void BuildStations()
@@ -223,6 +259,7 @@ namespace Game.Gameplay
             _boosterRepository.Save(_boosters);
             _walletRepository.Save(_wallet);
             SaveStationProgress();
+            _offlineClockRepository.Save(DateTime.UtcNow);
         }
 
         private void SaveStationProgress()

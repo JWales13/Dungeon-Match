@@ -3,9 +3,22 @@
 Supersedes the original `ROADMAP.md`. Sequenced to prove the core loop first,
 on a clean base. Status key: ✅ done · 🔨 in progress · ⬜ not started
 
-**Where we are:** Phases 0–3 complete. The board → ingredients → auto-crafted
-Dynamite chain runs end to end. Next is Phase 4, the last piece of the First
-Playable Milestone. Test suite: 30 EditMode tests green.
+**Where we are:** Phases 0–5 complete. The Green Room now runs four Producer
+stations (Bomb Bench, Goo Lab, Wire Rig, Mess Kit) off a data-driven Station
+Catalog: each has its own build cost, upgrade ladder, and ingredient/booster
+pairing, built/upgraded by spending Prize Vouchers. The full loop works: Play
+a floor → harvest → win pays Gold + a Prize Voucher (with an ingredient
+tally) → Exit to hub; lose → Continue (escalating Gold, +5 moves, same
+board) / Retry / Exit.
+Offline production catch-up (5d) is in too: stations fast-forward on launch
+for however long the app was closed, capped at 8 hours by default.
+**Next: Phase 6** — procedural floors & difficulty tiers.
+Test suite: 59 EditMode tests green.
+
+Two currencies live: **Gold** (from wins; funds Continues) and **Prize
+Voucher** (+1 per win; funds Green Room station builds/upgrades). Deferred:
+visible upgrade art (Phase 8 juice pass). Outstanding small polish: rename
+the Play button to "Descend" (one-line scene edit, not yet done).
 
 ---
 
@@ -47,16 +60,20 @@ to a single-floor combat base. Kept board, combat, theme.
   reserved as the future offline-production cap.
 - StationView shows production status + stock. BoosterInventory persisted.
 
-### ⬜ Phase 4 — Loadout & in-floor boosters  → **FIRST PLAYABLE MILESTONE**
+### ✅ Phase 4 — Loadout & in-floor boosters  → **FIRST PLAYABLE MILESTONE**
 - Bring one Dynamite into a floor; tap to place/detonate.
 - Close the loop end to end with placeholder art.
 - **Stop and playtest. Decide the loop is fun before proceeding.**
 
-### ⬜ Phase 5 — The Green Room (base view)
-- Move the Bomb Bench (and its status/stock) to a hub between floors; station
-  ticks there and offline. Fixed station slots; build/upgrade with gold; visible
-  upgrade art. Add the other three producers + boosters. "Descend" button to
-  launch a floor (replaces the Play Again scaffold).
+### ✅ Phase 5 — The Green Room (base view)
+- 5a: Moved the Bomb Bench to a hub between floors (Green Room/Floor scene
+  split); station ticks there in real time.
+- 5b: Build/upgrade stations by spending Prize Vouchers (StationCatalog,
+  StationProgress); added the other three producers (Goo Lab, Wire Rig, Mess
+  Kit).
+- 5d: Offline production catch-up (ProducerStation.FastForward, capped
+  window).
+- Deferred to Phase 8 (juice pass): visible upgrade art.
 
 ### ⬜ Phase 6 — Procedural floors & difficulty tiers
 - Depth-driven floor generation. Tiers: Regular / Main Event (hard) / Sweeps

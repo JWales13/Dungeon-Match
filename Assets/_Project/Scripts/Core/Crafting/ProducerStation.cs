@@ -7,7 +7,9 @@ namespace Game.Core
     /// A crafting station that turns one ingredient plus real time into one
     /// booster, held in a small buffer the player collects. Auto-produces while
     /// it has ingredients and buffer space. Time-driven via Tick(deltaSeconds)
-    /// rather than Unity's clock, so production is fully unit tested.
+    /// (one frame) or FastForward(totalSeconds) (a long stretch at once, e.g.
+    /// offline catch-up) rather than Unity's clock, so production is fully
+    /// unit tested.
     ///
     /// Ingredients are spent up front when a unit STARTS; the unit lands in the
     /// buffer after ProductionSeconds. Buffer capacity throttles it (and is the
@@ -82,6 +84,41 @@ namespace Game.Core
             }
         }
 
+        /// <summary>
+        /// Simulates a long stretch of time all at once (how long the app was
+        /// closed, say) rather than one frame. Unlike Tick, this loops so it
+        /// can complete several units in a single call - still capped by
+        /// buffer capacity and available ingredients, so it can't produce an
+        /// unbounded backlog. Any leftover time once production stops (buffer
+        /// full or out of ingredients) is simply not used. Used for offline
+        /// production catch-up; ordinary per-frame updates should keep using
+        /// Tick.
+        /// </summary>
+        public void FastForward(float totalSeconds)
+        {
+            float remaining = totalSeconds;
+            while (remaining > 0f)
+            {
+                if (!IsProducing && !TryStartProduction())
+                {
+                    return;
+                }
+
+                float secondsToComplete = ProductionSeconds - _progress;
+                if (remaining < secondsToComplete)
+                {
+                    _progress += remaining;
+                    return;
+                }
+
+                remaining -= secondsToComplete;
+                _progress = 0f;
+                BufferCount++;
+                IsProducing = false;
+                Changed?.Invoke();
+            }
+        }
+
         /// <summary>Empties the buffer and returns how many boosters were collected.</summary>
         public int Collect()
         {
@@ -95,21 +132,22 @@ namespace Game.Core
             return collected;
         }
 
-        private void TryStartProduction()
+        private bool TryStartProduction()
         {
             if (IsBufferFull)
             {
-                return;
+                return false;
             }
 
             if (!_ingredients.TrySpend(IngredientColor, IngredientCost))
             {
-                return;
+                return false;
             }
 
             IsProducing = true;
             _progress = 0f;
             Changed?.Invoke();
+            return true;
         }
     }
 }

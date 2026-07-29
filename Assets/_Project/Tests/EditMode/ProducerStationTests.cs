@@ -108,5 +108,63 @@ namespace Game.Tests
                 new ProducerStation(BoosterType.Dynamite, TileType.Red,
                     ingredientCost: 2, productionSeconds: 5f, bufferCapacity: 2, ingredients, initialBufferCount: 3));
         }
+
+        [Test]
+        public void FastForward_CompletesMultipleUnits_InOneCall()
+        {
+            var ingredients = new IngredientInventory();
+            ingredients.Add(TileType.Red, 100);
+            var station = Bench(ingredients, cost: 1, seconds: 1f, capacity: 10);
+
+            station.FastForward(3.5f); // 3 whole units, 0.5s left over into a 4th
+
+            Assert.AreEqual(3, station.BufferCount);
+            Assert.IsTrue(station.IsProducing);
+            Assert.AreEqual(0.5f, station.SecondsRemaining, 0.0001f);
+        }
+
+        [Test]
+        public void FastForward_StopsAtBufferCapacity_LeftoverTimeUnused()
+        {
+            var ingredients = new IngredientInventory();
+            ingredients.Add(TileType.Red, 1000);
+            var station = Bench(ingredients, cost: 1, seconds: 1f, capacity: 2);
+
+            station.FastForward(1000f); // way more time than the buffer could ever hold
+
+            Assert.AreEqual(2, station.BufferCount);
+            Assert.IsTrue(station.IsBufferFull);
+            Assert.IsFalse(station.IsProducing); // stopped, not left mid-unit past the cap
+            Assert.AreEqual(998, ingredients.GetCount(TileType.Red)); // exactly 2 units spent, no more
+        }
+
+        [Test]
+        public void FastForward_StopsWhenOutOfIngredients_LeftoverTimeUnused()
+        {
+            var ingredients = new IngredientInventory();
+            ingredients.Add(TileType.Red, 2); // enough for exactly one unit at cost 2, then dry
+            var station = Bench(ingredients, cost: 2, seconds: 1f, capacity: 10);
+
+            station.FastForward(100f);
+
+            Assert.AreEqual(1, station.BufferCount);
+            Assert.IsFalse(station.IsProducing);
+            Assert.AreEqual(0, ingredients.GetCount(TileType.Red));
+        }
+
+        [Test]
+        public void FastForward_RespectsExistingProgress_BeforeStartingFresh()
+        {
+            var ingredients = new IngredientInventory();
+            ingredients.Add(TileType.Red, 100);
+            var station = Bench(ingredients, cost: 1, seconds: 5f, capacity: 10);
+
+            station.Tick(3f); // 3s into the first unit, not done
+            station.FastForward(4f); // 3 + 4 = 7s -> completes (needed 5), 2s left into the next
+
+            Assert.AreEqual(1, station.BufferCount);
+            Assert.IsTrue(station.IsProducing);
+            Assert.AreEqual(3f, station.SecondsRemaining, 0.0001f); // 5 - 2 remaining
+        }
     }
 }
